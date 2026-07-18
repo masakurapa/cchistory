@@ -134,6 +134,7 @@ func (r *Root) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
 
 		r.backButton.SetText("← Back")
 		r.backButton.OnDown(func(context *guigui.Context) {
+			r.sessionTable.SelectItemByIndex(-1)
 			r.currentScreen = screenList
 		})
 

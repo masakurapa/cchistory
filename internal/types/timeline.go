@@ -167,7 +167,11 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 		// local command handling (user entries only)
 		if entry.Type == "user" {
 			if strings.HasPrefix(content, "<local-command-caveat>") ||
-				strings.HasPrefix(content, "<command-message>") {
+				strings.HasPrefix(content, "<command-message>") ||
+				strings.HasPrefix(content, "<command-name>") ||
+				strings.HasPrefix(content, "<command-args>") ||
+				strings.HasPrefix(content, "<local-command-stdout>") ||
+				strings.HasPrefix(content, "<local-command-stderr>") {
 				continue
 			}
 			if strings.Contains(content, "<bash-input>") {

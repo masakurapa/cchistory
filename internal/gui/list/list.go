@@ -1,6 +1,7 @@
 package list
 
 import (
+	"cmp"
 	"slices"
 
 	"github.com/guigui-gui/guigui"
@@ -22,7 +23,9 @@ func New() *Widget {
 }
 
 func (w *Widget) SetSessions(sessions []types.Session) {
-	w.sessions = sessions
+	w.sessions = slices.SortedFunc(slices.Values(sessions), func(a, b types.Session) int {
+		return cmp.Compare(b.ModTime.UnixNano(), a.ModTime.UnixNano())
+	})
 }
 
 func (w *Widget) SetOnSelected(fn func(*guigui.Context, types.Session)) {
@@ -39,7 +42,7 @@ func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error 
 
 	w.sessionTable.SetItemHeight(u)
 	w.sessionTable.SetColumns([]basicwidget.TableColumn{
-		{HeaderText: "id", Width: guigui.FixedSize(u * 10)},
+		{HeaderText: "id", Width: guigui.FixedSize(u * 11)},
 		{HeaderText: "name", Width: guigui.FlexibleSize(1)},
 		{HeaderText: "updated", Width: guigui.FixedSize(u * 6)},
 	})

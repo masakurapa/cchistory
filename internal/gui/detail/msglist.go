@@ -1,4 +1,4 @@
-package main
+package detail
 
 import (
 	"fmt"
@@ -30,7 +30,6 @@ func (w *turnRowWidget) Build(context *guigui.Context, adder *guigui.ChildAdder)
 		w.turn.User.Timestamp.Local().Format("2006-01-02 15:04:05.000"),
 		firstLine,
 	)
-
 	if w.turn.Cancelled() {
 		header = "[cancelled] " + header
 	}
@@ -42,7 +41,6 @@ func (w *turnRowWidget) Build(context *guigui.Context, adder *guigui.ChildAdder)
 	w.expander.SetHeaderWidget(&w.headerText)
 	w.expander.SetContentWidget(&w.contentText)
 	adder.AddWidget(&w.expander)
-
 	return nil
 }
 
@@ -199,11 +197,11 @@ func (w *localCmdRowWidget) Measure(context *guigui.Context, constraints guigui.
 type msgListWidget struct {
 	guigui.DefaultWidget
 
-	rows        guigui.WidgetSlice[*turnRowWidget]
-	compactRows guigui.WidgetSlice[*compactRowWidget]
+	rows         guigui.WidgetSlice[*turnRowWidget]
+	compactRows  guigui.WidgetSlice[*compactRowWidget]
 	localCmdRows guigui.WidgetSlice[*localCmdRowWidget]
-	dividers    guigui.WidgetSlice[*basicwidget.Divider]
-	layoutItems []guigui.LinearLayoutItem
+	dividers     guigui.WidgetSlice[*basicwidget.Divider]
+	layoutItems  []guigui.LinearLayoutItem
 
 	items []types.TimelineItem
 }

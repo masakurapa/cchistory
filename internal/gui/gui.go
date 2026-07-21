@@ -5,7 +5,7 @@ import (
 
 	"github.com/guigui-gui/guigui"
 	_ "github.com/guigui-gui/guigui/basicwidget/cjkfont"
-	"github.com/masakurapa/cchist/internal/types"
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 type Widget interface {

@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 
-	"github.com/masakurapa/cchist/internal/cc"
-	"github.com/masakurapa/cchist/internal/gui"
-	"github.com/masakurapa/cchist/internal/types"
+	"github.com/masakurapa/cchistory/internal/cc"
+	"github.com/masakurapa/cchistory/internal/gui"
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 func main() {
-	paths, err := cc.SessionFilePaths()
+	projectDir, paths, err := cc.SessionFilePaths()
 	if err != nil {
 		log.Fatal(err)
 	}

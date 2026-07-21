@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/masakurapa/cchist/internal/types"
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 func formatTokens(n int) string {

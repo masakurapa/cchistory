@@ -5,9 +5,9 @@ import (
 
 	"github.com/guigui-gui/guigui"
 	"github.com/guigui-gui/guigui/basicwidget"
-	"github.com/masakurapa/cchist/internal/gui/detail"
-	"github.com/masakurapa/cchist/internal/gui/list"
-	"github.com/masakurapa/cchist/internal/types"
+	"github.com/masakurapa/cchistory/internal/gui/detail"
+	"github.com/masakurapa/cchistory/internal/gui/list"
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 type root struct {

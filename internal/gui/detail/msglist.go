@@ -8,7 +8,7 @@ import (
 
 	"github.com/guigui-gui/guigui"
 	"github.com/guigui-gui/guigui/basicwidget"
-	"github.com/masakurapa/cchist/internal/types"
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 type turnRowWidget struct {

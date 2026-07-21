@@ -6,18 +6,19 @@ import (
 	"strings"
 )
 
-func SessionFilePaths() ([]string, error) {
+func SessionFilePaths() (string, []string, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	dirName := strings.ReplaceAll(pwd, "/", "-")
 	prjDir := filepath.Join(home, ".claude", "projects", dirName)
-	return loadSessions(prjDir)
+	paths, err := loadSessions(prjDir)
+	return prjDir, paths, err
 }
 
 func loadSessions(projectDir string) ([]string, error) {

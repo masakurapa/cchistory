@@ -1,4 +1,4 @@
-module github.com/masakurapa/cchist
+module github.com/masakurapa/cchistory
 
 go 1.25.0
 

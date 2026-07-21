@@ -44,6 +44,7 @@ func (r *root) initListWidget(projectDir string, sessions []types.Session) {
 
 func (r *root) initDetailWidget() {
 	r.detail.SetOnBack(func(ctx *guigui.Context) {
+		r.list.ResetSelection()
 		r.current = r.list
 	})
 }

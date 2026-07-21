@@ -29,6 +29,10 @@ func (w *Widget) SetOnSelected(fn func(*guigui.Context, types.Session)) {
 	w.onSelected = fn
 }
 
+func (w *Widget) ResetSelection() {
+	w.sessionTable.SelectItemByIndex(-1)
+}
+
 func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
 	u := basicwidget.UnitSize(context)
 	adder.AddWidget(&w.sessionTable)

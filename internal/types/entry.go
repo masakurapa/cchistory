@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -72,6 +74,9 @@ func ParseSession(path string) (Session, error) {
 		}
 	}
 
+	if s.ID == "" {
+		s.ID = strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	}
 	if customTitle != "" {
 		s.Name = customTitle
 	} else {

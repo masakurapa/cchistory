@@ -130,6 +130,7 @@ func (w *metaFormWidget) Build(context *guigui.Context, adder *guigui.ChildAdder
 		label.SetValue(labelText)
 		value.SetValue(valueText)
 		value.SetHorizontalAlign(basicwidget.HorizontalAlignEnd)
+		value.SetSelectable(true)
 		w.formItems = append(w.formItems, basicwidget.FormItem{
 			PrimaryWidget:   label,
 			SecondaryWidget: value,
@@ -376,6 +377,65 @@ func (w *localCmdRowWidget) Measure(context *guigui.Context, constraints guigui.
 	return w.headerText.Measure(context, constraints)
 }
 
+// summaryFormWidget displays session total usage in macOS-settings-style Form.
+type summaryFormWidget struct {
+	guigui.DefaultWidget
+
+	form      basicwidget.Form
+	total     types.Usage
+	sessionID string
+
+	idLabel     basicwidget.Text
+	idValue     basicwidget.Text
+	inputLabel  basicwidget.Text
+	inputValue  basicwidget.Text
+	outputLabel basicwidget.Text
+	outputValue basicwidget.Text
+	cacheRLabel basicwidget.Text
+	cacheRValue basicwidget.Text
+	cacheCLabel basicwidget.Text
+	cacheCValue basicwidget.Text
+
+	formItems []basicwidget.FormItem
+}
+
+func (w *summaryFormWidget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	w.formItems = w.formItems[:0]
+
+	row := func(label *basicwidget.Text, labelText string, value *basicwidget.Text, valueText string) {
+		label.SetValue(labelText)
+		value.SetValue(valueText)
+		value.SetHorizontalAlign(basicwidget.HorizontalAlignEnd)
+		value.SetSelectable(true)
+		w.formItems = append(w.formItems, basicwidget.FormItem{
+			PrimaryWidget:   label,
+			SecondaryWidget: value,
+		})
+	}
+
+	row(&w.idLabel, "ID", &w.idValue, w.sessionID)
+	row(&w.inputLabel, "Input Token", &w.inputValue, formatTokens(w.total.InputTokens))
+	row(&w.outputLabel, "Output Token", &w.outputValue, formatTokens(w.total.OutputTokens))
+	if w.total.CacheReadInputTokens > 0 {
+		row(&w.cacheRLabel, "Cache Read", &w.cacheRValue, formatTokens(w.total.CacheReadInputTokens))
+	}
+	if w.total.CacheCreationInputTokens > 0 {
+		row(&w.cacheCLabel, "Cache Creation", &w.cacheCValue, formatTokens(w.total.CacheCreationInputTokens))
+	}
+
+	w.form.SetItems(w.formItems)
+	adder.AddWidget(&w.form)
+	return nil
+}
+
+func (w *summaryFormWidget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	layouter.LayoutWidget(&w.form, widgetBounds.Bounds())
+}
+
+func (w *summaryFormWidget) Measure(context *guigui.Context, constraints guigui.Constraints) image.Point {
+	return w.form.Measure(context, constraints)
+}
+
 type msgListWidget struct {
 	guigui.DefaultWidget
 
@@ -383,15 +443,23 @@ type msgListWidget struct {
 	compactRows  guigui.WidgetSlice[*compactRowWidget]
 	localCmdRows guigui.WidgetSlice[*localCmdRowWidget]
 	dividers     guigui.WidgetSlice[*basicwidget.Divider]
+	headerDivider basicwidget.Divider
 	layoutItems  []guigui.LinearLayoutItem
 
-	items []types.TimelineItem
+	summaryForm *summaryFormWidget
+	items       []types.TimelineItem
 }
 
 func (w *msgListWidget) layout(context *guigui.Context) guigui.LinearLayout {
 	u := basicwidget.UnitSize(context)
 	n := len(w.items)
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
+	if w.summaryForm != nil {
+		w.layoutItems = append(w.layoutItems,
+			guigui.LinearLayoutItem{Widget: w.summaryForm},
+			guigui.LinearLayoutItem{Widget: &w.headerDivider, Size: guigui.FixedSize(1)},
+		)
+	}
 	ti, ci, li := 0, 0, 0
 	for i, item := range w.items {
 		var widget guigui.Widget
@@ -419,6 +487,10 @@ func (w *msgListWidget) layout(context *guigui.Context) guigui.LinearLayout {
 }
 
 func (w *msgListWidget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	if w.summaryForm != nil {
+		adder.AddWidget(w.summaryForm)
+		adder.AddWidget(&w.headerDivider)
+	}
 	n := len(w.items)
 
 	turnCount, compactCount, localCmdCount := 0, 0, 0

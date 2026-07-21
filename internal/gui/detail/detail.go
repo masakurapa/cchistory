@@ -17,7 +17,7 @@ type Widget struct {
 
 	backButton  basicwidget.Button
 	titleText   basicwidget.Text
-	summaryText basicwidget.Text
+	summaryForm summaryFormWidget
 	panel       basicwidget.Panel
 	msgList     msgListWidget
 	layoutItems []guigui.LinearLayoutItem
@@ -40,7 +40,6 @@ func (w *Widget) SetOnBack(fn func(*guigui.Context)) {
 func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
 	adder.AddWidget(&w.backButton)
 	adder.AddWidget(&w.titleText)
-	adder.AddWidget(&w.summaryText)
 	adder.AddWidget(&w.panel)
 
 	w.backButton.SetText("← Back")
@@ -63,9 +62,10 @@ func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error 
 			total.CacheCreationInputTokens += u.CacheCreationInputTokens
 		}
 	}
-	w.summaryText.SetValue(formatUsage(total))
-	w.summaryText.SetMultiline(true)
+	w.summaryForm.sessionID = w.session.ID
+	w.summaryForm.total = total
 
+	w.msgList.summaryForm = &w.summaryForm
 	w.msgList.items = w.items
 	w.panel.SetContent(&w.msgList)
 	w.panel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)
@@ -90,7 +90,6 @@ func (w *Widget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBoun
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
 	w.layoutItems = append(w.layoutItems,
 		guigui.LinearLayoutItem{Layout: &header, Size: guigui.FixedSize(u)},
-		guigui.LinearLayoutItem{Widget: &w.summaryText, Size: guigui.FixedSize(u * 2)},
 		guigui.LinearLayoutItem{Widget: &w.panel, Size: guigui.FlexibleSize(1)},
 	)
 	(guigui.LinearLayout{

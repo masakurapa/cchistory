@@ -3,8 +3,6 @@ package detail
 import (
 	"fmt"
 	"strings"
-
-	"github.com/masakurapa/cchistory/internal/types"
 )
 
 func formatTokens(n int) string {
@@ -19,12 +17,3 @@ func formatTokens(n int) string {
 	return b.String()
 }
 
-func formatUsage(u types.Usage) string {
-	return fmt.Sprintf(
-		"Input Token: %s  Output Token: %s\nCache Read Token: %s  Cache Creation Token: %s",
-		formatTokens(u.InputTokens),
-		formatTokens(u.OutputTokens),
-		formatTokens(u.CacheReadInputTokens),
-		formatTokens(u.CacheCreationInputTokens),
-	)
-}

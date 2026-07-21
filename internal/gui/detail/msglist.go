@@ -97,6 +97,76 @@ func (w *textAreaWidget) Measure(context *guigui.Context, constraints guigui.Con
 	return image.Pt(width, w.height(context, width))
 }
 
+// metaFormWidget displays turn metadata in a macOS-settings-style Form.
+type metaFormWidget struct {
+	guigui.DefaultWidget
+
+	form basicwidget.Form
+	turn types.Turn
+
+	finishedLabel basicwidget.Text
+	finishedValue basicwidget.Text
+	modelLabel    basicwidget.Text
+	modelValue    basicwidget.Text
+	effortLabel   basicwidget.Text
+	effortValue   basicwidget.Text
+	inputLabel    basicwidget.Text
+	inputValue    basicwidget.Text
+	outputLabel   basicwidget.Text
+	outputValue   basicwidget.Text
+	cacheRLabel   basicwidget.Text
+	cacheRValue   basicwidget.Text
+	cacheCLabel   basicwidget.Text
+	cacheCValue   basicwidget.Text
+
+	formItems []basicwidget.FormItem
+}
+
+func (w *metaFormWidget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	usage := w.turn.TotalUsage()
+	w.formItems = w.formItems[:0]
+
+	row := func(label *basicwidget.Text, labelText string, value *basicwidget.Text, valueText string) {
+		label.SetValue(labelText)
+		value.SetValue(valueText)
+		value.SetHorizontalAlign(basicwidget.HorizontalAlignEnd)
+		w.formItems = append(w.formItems, basicwidget.FormItem{
+			PrimaryWidget:   label,
+			SecondaryWidget: value,
+		})
+	}
+
+	if t := w.turn.FinishedAt(); !t.IsZero() {
+		row(&w.finishedLabel, "Finished", &w.finishedValue, t.Local().Format("2006-01-02 15:04:05"))
+	}
+	if m := w.turn.Model(); m != "" {
+		row(&w.modelLabel, "Model", &w.modelValue, m)
+	}
+	if e := w.turn.Effort(); e != "" {
+		row(&w.effortLabel, "Effort", &w.effortValue, e)
+	}
+	row(&w.inputLabel, "Input Token", &w.inputValue, formatTokens(usage.InputTokens))
+	row(&w.outputLabel, "Output Token", &w.outputValue, formatTokens(usage.OutputTokens))
+	if usage.CacheReadInputTokens > 0 {
+		row(&w.cacheRLabel, "Cache Read", &w.cacheRValue, formatTokens(usage.CacheReadInputTokens))
+	}
+	if usage.CacheCreationInputTokens > 0 {
+		row(&w.cacheCLabel, "Cache Creation", &w.cacheCValue, formatTokens(usage.CacheCreationInputTokens))
+	}
+
+	w.form.SetItems(w.formItems)
+	adder.AddWidget(&w.form)
+	return nil
+}
+
+func (w *metaFormWidget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	layouter.LayoutWidget(&w.form, widgetBounds.Bounds())
+}
+
+func (w *metaFormWidget) Measure(context *guigui.Context, constraints guigui.Constraints) image.Point {
+	return w.form.Measure(context, constraints)
+}
+
 // turnContentWidget is the content area inside the Expander for a single turn.
 type turnContentWidget struct {
 	guigui.DefaultWidget
@@ -105,7 +175,7 @@ type turnContentWidget struct {
 	userArea    textAreaWidget
 	assistLabel basicwidget.Text
 	assistArea  textAreaWidget
-	metaText    basicwidget.Text
+	metaForm    metaFormWidget
 	layoutItems []guigui.LinearLayoutItem
 
 	turn types.Turn
@@ -118,33 +188,12 @@ func (w *turnContentWidget) Build(context *guigui.Context, adder *guigui.ChildAd
 
 	if !w.turn.Cancelled() {
 		w.assistLabel.SetValue("Assistant:")
-		w.metaText.SetValue(w.buildMeta())
-		w.metaText.SetMultiline(true)
+		w.metaForm.turn = w.turn
 		adder.AddWidget(&w.assistLabel)
 		adder.AddWidget(&w.assistArea)
-		adder.AddWidget(&w.metaText)
+		adder.AddWidget(&w.metaForm)
 	}
 	return nil
-}
-
-func (w *turnContentWidget) buildMeta() string {
-	var sb strings.Builder
-	if t := w.turn.FinishedAt(); !t.IsZero() {
-		sb.WriteString(fmt.Sprintf("Finished: %s\n", t.Local().Format("2006-01-02 15:04:05.000")))
-	}
-	var meta []string
-	if m := w.turn.Model(); m != "" {
-		meta = append(meta, "Model: "+m)
-	}
-	if e := w.turn.Effort(); e != "" {
-		meta = append(meta, "Effort: "+e)
-	}
-	if len(meta) > 0 {
-		sb.WriteString(strings.Join(meta, "  "))
-		sb.WriteString("\n")
-	}
-	sb.WriteString(formatUsage(w.turn.TotalUsage()))
-	return strings.TrimRight(sb.String(), "\n")
 }
 
 func (w *turnContentWidget) buildLayout(context *guigui.Context, width int) guigui.LinearLayout {
@@ -158,7 +207,7 @@ func (w *turnContentWidget) buildLayout(context *guigui.Context, width int) guig
 		w.layoutItems = append(w.layoutItems,
 			guigui.LinearLayoutItem{Widget: &w.assistLabel, Size: guigui.FixedSize(u)},
 			guigui.LinearLayoutItem{Widget: &w.assistArea, Size: guigui.FixedSize(w.assistArea.height(context, width))},
-			guigui.LinearLayoutItem{Widget: &w.metaText},
+			guigui.LinearLayoutItem{Widget: &w.metaForm},
 		)
 	}
 	return guigui.LinearLayout{

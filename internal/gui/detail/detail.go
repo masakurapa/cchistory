@@ -68,6 +68,7 @@ func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error 
 
 	w.msgList.items = w.items
 	w.panel.SetContent(&w.msgList)
+	w.panel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)
 
 	return nil
 }

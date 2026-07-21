@@ -3,20 +3,191 @@ package detail
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"slices"
 	"strings"
 
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/guigui-gui/guigui"
 	"github.com/guigui-gui/guigui/basicwidget"
 	"github.com/masakurapa/cchistory/internal/types"
 )
 
+const (
+	textAreaMinLines = 3
+	textAreaMaxLines = 5
+)
+
+// textAreaContent is the panel content: a Text widget with horizontal padding.
+type textAreaContent struct {
+	guigui.DefaultWidget
+	text basicwidget.Text
+}
+
+func (w *textAreaContent) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	adder.AddWidget(&w.text)
+	return nil
+}
+
+func (w *textAreaContent) hPad(context *guigui.Context) int {
+	return basicwidget.UnitSize(context) / 2
+}
+
+func (w *textAreaContent) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	p := w.hPad(context)
+	b := widgetBounds.Bounds()
+	layouter.LayoutWidget(&w.text, image.Rect(b.Min.X+p, b.Min.Y, b.Max.X-p, b.Max.Y))
+}
+
+func (w *textAreaContent) Measure(context *guigui.Context, constraints guigui.Constraints) image.Point {
+	p := w.hPad(context)
+	inner := constraints
+	if fw, ok := constraints.FixedWidth(); ok {
+		inner = guigui.FixedWidthConstraints(max(0, fw-p*2))
+	}
+	m := w.text.Measure(context, inner)
+	return image.Pt(m.X+p*2, m.Y)
+}
+
+// textAreaWidget is a scrollable read-only text box with a white background.
+type textAreaWidget struct {
+	guigui.DefaultWidget
+
+	panel   basicwidget.Panel
+	content textAreaContent
+}
+
+func (w *textAreaWidget) setText(s string) {
+	w.content.text.SetValue(s)
+	w.content.text.SetWrapMode(basicwidget.WrapModeNormal)
+	w.content.text.SetMultiline(true)
+	w.content.text.SetSelectable(true)
+}
+
+func (w *textAreaWidget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	w.panel.SetContent(&w.content)
+	w.panel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)
+	w.panel.SetBackgroundStyle(basicwidget.PanelBackgroundStyleNone)
+	w.panel.SetBorders(basicwidget.PanelBorders{Start: true, Top: true, End: true, Bottom: true})
+	adder.AddWidget(&w.panel)
+	return nil
+}
+
+func (w *textAreaWidget) Draw(_ *guigui.Context, widgetBounds *guigui.WidgetBounds, dst *ebiten.Image) {
+	dst.SubImage(widgetBounds.Bounds()).(*ebiten.Image).Fill(color.White)
+}
+
+func (w *textAreaWidget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	layouter.LayoutWidget(&w.panel, widgetBounds.Bounds())
+}
+
+func (w *textAreaWidget) height(context *guigui.Context, width int) int {
+	u := basicwidget.UnitSize(context)
+	minH := u * textAreaMinLines
+	maxH := u * textAreaMaxLines
+	measured := w.content.Measure(context, guigui.FixedWidthConstraints(width))
+	return max(minH, min(measured.Y, maxH))
+}
+
+func (w *textAreaWidget) Measure(context *guigui.Context, constraints guigui.Constraints) image.Point {
+	width, ok := constraints.FixedWidth()
+	if !ok {
+		width = 800
+	}
+	return image.Pt(width, w.height(context, width))
+}
+
+// turnContentWidget is the content area inside the Expander for a single turn.
+type turnContentWidget struct {
+	guigui.DefaultWidget
+
+	userLabel   basicwidget.Text
+	userArea    textAreaWidget
+	assistLabel basicwidget.Text
+	assistArea  textAreaWidget
+	metaText    basicwidget.Text
+	layoutItems []guigui.LinearLayoutItem
+
+	turn types.Turn
+}
+
+func (w *turnContentWidget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
+	w.userLabel.SetValue("User:")
+	adder.AddWidget(&w.userLabel)
+	adder.AddWidget(&w.userArea)
+
+	if !w.turn.Cancelled() {
+		w.assistLabel.SetValue("Assistant:")
+		w.metaText.SetValue(w.buildMeta())
+		w.metaText.SetMultiline(true)
+		adder.AddWidget(&w.assistLabel)
+		adder.AddWidget(&w.assistArea)
+		adder.AddWidget(&w.metaText)
+	}
+	return nil
+}
+
+func (w *turnContentWidget) buildMeta() string {
+	var sb strings.Builder
+	if t := w.turn.FinishedAt(); !t.IsZero() {
+		sb.WriteString(fmt.Sprintf("Finished: %s\n", t.Local().Format("2006-01-02 15:04:05.000")))
+	}
+	var meta []string
+	if m := w.turn.Model(); m != "" {
+		meta = append(meta, "Model: "+m)
+	}
+	if e := w.turn.Effort(); e != "" {
+		meta = append(meta, "Effort: "+e)
+	}
+	if len(meta) > 0 {
+		sb.WriteString(strings.Join(meta, "  "))
+		sb.WriteString("\n")
+	}
+	sb.WriteString(formatUsage(w.turn.TotalUsage()))
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+func (w *turnContentWidget) buildLayout(context *guigui.Context, width int) guigui.LinearLayout {
+	u := basicwidget.UnitSize(context)
+	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
+	w.layoutItems = append(w.layoutItems,
+		guigui.LinearLayoutItem{Widget: &w.userLabel, Size: guigui.FixedSize(u)},
+		guigui.LinearLayoutItem{Widget: &w.userArea, Size: guigui.FixedSize(w.userArea.height(context, width))},
+	)
+	if !w.turn.Cancelled() {
+		w.layoutItems = append(w.layoutItems,
+			guigui.LinearLayoutItem{Widget: &w.assistLabel, Size: guigui.FixedSize(u)},
+			guigui.LinearLayoutItem{Widget: &w.assistArea, Size: guigui.FixedSize(w.assistArea.height(context, width))},
+			guigui.LinearLayoutItem{Widget: &w.metaText},
+		)
+	}
+	return guigui.LinearLayout{
+		Direction: guigui.LayoutDirectionVertical,
+		Items:     w.layoutItems,
+		Gap:       u / 4,
+		Padding:   guigui.Padding{Start: u / 2, Top: u / 2, End: u / 2, Bottom: u / 2},
+	}
+}
+
+func (w *turnContentWidget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	b := widgetBounds.Bounds()
+	w.buildLayout(context, b.Dx()).LayoutWidgets(context, b, layouter)
+}
+
+func (w *turnContentWidget) Measure(context *guigui.Context, constraints guigui.Constraints) image.Point {
+	width, ok := constraints.FixedWidth()
+	if !ok {
+		width = 800
+	}
+	return w.buildLayout(context, width).Measure(context, constraints)
+}
+
 type turnRowWidget struct {
 	guigui.DefaultWidget
 
-	expander    basicwidget.Expander
-	headerText  basicwidget.Text
-	contentText basicwidget.Text
+	expander   basicwidget.Expander
+	headerText basicwidget.Text
+	content    turnContentWidget
 
 	turn types.Turn
 }
@@ -34,55 +205,17 @@ func (w *turnRowWidget) Build(context *guigui.Context, adder *guigui.ChildAdder)
 		header = "[cancelled] " + header
 	}
 	w.headerText.SetValue(header)
-	w.contentText.SetValue(w.buildContent())
-	w.contentText.SetWrapMode(basicwidget.WrapModeNormal)
-	w.contentText.SetMultiline(true)
-	w.contentText.SetSelectable(true)
+
+	w.content.turn = w.turn
+	w.content.userArea.setText(w.turn.User.Content)
+	if !w.turn.Cancelled() {
+		w.content.assistArea.setText(w.turn.AssistantContent())
+	}
+
 	w.expander.SetHeaderWidget(&w.headerText)
-	w.expander.SetContentWidget(&w.contentText)
+	w.expander.SetContentWidget(&w.content)
 	adder.AddWidget(&w.expander)
 	return nil
-}
-
-func (w *turnRowWidget) buildContent() string {
-	var sb strings.Builder
-
-	sb.WriteString("User:\n")
-	sb.WriteString(w.turn.User.Content)
-
-	if w.turn.Cancelled() {
-		return strings.TrimRight(sb.String(), "\n")
-	}
-
-	sb.WriteString("\n\n──────────────────────────\n\n")
-
-	sb.WriteString("Assistant:\n")
-	if content := w.turn.AssistantContent(); content != "" {
-		sb.WriteString(content)
-		sb.WriteString("\n\n")
-	}
-
-	sb.WriteString("──────────────────────────\n")
-
-	if t := w.turn.FinishedAt(); !t.IsZero() {
-		sb.WriteString(fmt.Sprintf("Finished: %s\n", t.Local().Format("2006-01-02 15:04:05.000")))
-	}
-
-	var meta []string
-	if m := w.turn.Model(); m != "" {
-		meta = append(meta, "Model: "+m)
-	}
-	if e := w.turn.Effort(); e != "" {
-		meta = append(meta, "Effort: "+e)
-	}
-	if len(meta) > 0 {
-		sb.WriteString(strings.Join(meta, "  "))
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString(formatUsage(w.turn.TotalUsage()))
-
-	return strings.TrimRight(sb.String(), "\n")
 }
 
 func (w *turnRowWidget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {

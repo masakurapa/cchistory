@@ -1,11 +1,11 @@
-package detail
+package types
 
 import (
 	"fmt"
 	"strings"
 )
 
-func formatTokens(n int) string {
+func FormatTokens(n int) string {
 	s := fmt.Sprintf("%d", n)
 	var b strings.Builder
 	for i, c := range s {
@@ -16,4 +16,3 @@ func formatTokens(n int) string {
 	}
 	return b.String()
 }
-

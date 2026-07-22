@@ -6,13 +6,69 @@ import (
 )
 
 type Turn struct {
-	User      Message
-	Assistant []Message
+	UserMsg       Message
+	AssistantMsgs []Message
 }
 
-func (t Turn) AssistantContent() string {
+func (t Turn) Timestamp() time.Time { return t.UserMsg.Timestamp }
+
+func (t Turn) Headline() string {
+	line := t.UserMsg.Content
+	if i := strings.IndexByte(line, '\n'); i >= 0 {
+		line = line[:i]
+	}
+	return line
+}
+
+func (t Turn) Sections() []Section {
+	sections := []Section{{Label: "User", Text: t.UserMsg.Content}}
+	if content := t.assistantContent(); content != "" {
+		sections = append(sections, Section{Label: "Assistant", Text: content})
+	}
+	return sections
+}
+
+func (t Turn) Metadata() []Meta {
+	var metas []Meta
+	if ft := t.finishedAt(); !ft.IsZero() {
+		metas = append(metas, Meta{Name: "Finished", Value: ft.Local().Format("2006-01-02 15:04:05")})
+	}
+	if m := t.model(); m != "" {
+		metas = append(metas, Meta{Name: "Model", Value: m})
+	}
+	if e := t.effort(); e != "" {
+		metas = append(metas, Meta{Name: "Effort", Value: e})
+	}
+	u := t.TotalUsage()
+	metas = append(metas,
+		Meta{Name: "Input Token", Value: FormatTokens(u.InputTokens)},
+		Meta{Name: "Output Token", Value: FormatTokens(u.OutputTokens)},
+	)
+	if u.CacheReadInputTokens > 0 {
+		metas = append(metas, Meta{Name: "Cache Read", Value: FormatTokens(u.CacheReadInputTokens)})
+	}
+	if u.CacheCreationInputTokens > 0 {
+		metas = append(metas, Meta{Name: "Cache Creation", Value: FormatTokens(u.CacheCreationInputTokens)})
+	}
+	return metas
+}
+
+func (t Turn) Usage() Usage { return t.TotalUsage() }
+
+func (t Turn) TotalUsage() Usage {
+	var total Usage
+	for _, a := range t.AssistantMsgs {
+		total.InputTokens += a.Usage.InputTokens
+		total.OutputTokens += a.Usage.OutputTokens
+		total.CacheReadInputTokens += a.Usage.CacheReadInputTokens
+		total.CacheCreationInputTokens += a.Usage.CacheCreationInputTokens
+	}
+	return total
+}
+
+func (t Turn) assistantContent() string {
 	var parts []string
-	for _, a := range t.Assistant {
+	for _, a := range t.AssistantMsgs {
 		if a.Content != "" {
 			parts = append(parts, a.Content)
 		}
@@ -20,15 +76,15 @@ func (t Turn) AssistantContent() string {
 	return strings.Join(parts, "\n\n")
 }
 
-func (t Turn) FinishedAt() time.Time {
-	if len(t.Assistant) == 0 {
+func (t Turn) finishedAt() time.Time {
+	if len(t.AssistantMsgs) == 0 {
 		return time.Time{}
 	}
-	return t.Assistant[len(t.Assistant)-1].Timestamp
+	return t.AssistantMsgs[len(t.AssistantMsgs)-1].Timestamp
 }
 
-func (t Turn) Model() string {
-	for _, a := range t.Assistant {
+func (t Turn) model() string {
+	for _, a := range t.AssistantMsgs {
 		if a.Model != "" {
 			return a.Model
 		}
@@ -36,28 +92,13 @@ func (t Turn) Model() string {
 	return ""
 }
 
-func (t Turn) Effort() string {
-	for _, a := range t.Assistant {
+func (t Turn) effort() string {
+	for _, a := range t.AssistantMsgs {
 		if a.Effort != "" {
 			return a.Effort
 		}
 	}
 	return ""
-}
-
-func (t Turn) Cancelled() bool {
-	return len(t.Assistant) == 0
-}
-
-func (t Turn) TotalUsage() Usage {
-	var total Usage
-	for _, a := range t.Assistant {
-		total.InputTokens += a.Usage.InputTokens
-		total.OutputTokens += a.Usage.OutputTokens
-		total.CacheReadInputTokens += a.Usage.CacheReadInputTokens
-		total.CacheCreationInputTokens += a.Usage.CacheCreationInputTokens
-	}
-	return total
 }
 
 func ParseTurns(path string) ([]Turn, error) {
@@ -69,10 +110,10 @@ func ParseTurns(path string) ([]Turn, error) {
 	for _, msg := range messages {
 		switch msg.Role {
 		case RoleUser:
-			turns = append(turns, Turn{User: msg})
+			turns = append(turns, Turn{UserMsg: msg})
 		case RoleAssistant:
 			if len(turns) > 0 {
-				turns[len(turns)-1].Assistant = append(turns[len(turns)-1].Assistant, msg)
+				turns[len(turns)-1].AssistantMsgs = append(turns[len(turns)-1].AssistantMsgs, msg)
 			}
 		}
 	}

@@ -26,11 +26,11 @@ func New() *Widget {
 	return w
 }
 
-func (w *Widget) SetData(session types.Session, items []types.TimelineItem) {
-	w.summaryView.setData(session, items)
+func (w *Widget) SetData(d types.SessionDetail) {
+	w.summaryView.setData(d)
 	w.summaryView.onBack = w.onBack
 	w.summaryView.onMsgDetail = func(ctx *guigui.Context) {
-		w.msgDetail.items = items
+		w.msgDetail.items = d.Items
 		w.msgDetail.selectedItemIdx = -1
 		w.msgDetail.onBack = func(ctx *guigui.Context) {
 			w.current = &w.summaryView

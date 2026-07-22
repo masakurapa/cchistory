@@ -10,7 +10,7 @@ import (
 )
 
 type CompactBoundary struct {
-	Timestamp     time.Time
+	Time          time.Time
 	Trigger       string
 	PreTokens     int
 	PostTokens    int
@@ -19,18 +19,61 @@ type CompactBoundary struct {
 	Summary       string
 }
 
-type LocalCommand struct {
-	Timestamp time.Time
-	Input     string
-	Stdout    string
-	Stderr    string
+func (cb *CompactBoundary) Timestamp() time.Time { return cb.Time }
+
+func (cb *CompactBoundary) Headline() string { return "auto compacting" }
+
+func (cb *CompactBoundary) Sections() []Section {
+	if cb.Summary == "" {
+		return nil
+	}
+	return []Section{{Label: "Summary", Text: cb.Summary}}
 }
 
-type TimelineItem struct {
-	Turn            *Turn
-	CompactBoundary *CompactBoundary
-	LocalCommand    *LocalCommand
+func (cb *CompactBoundary) Metadata() []Meta {
+	metas := []Meta{
+		{Name: "Timestamp", Value: cb.Time.Local().Format("2006-01-02 15:04:05")},
+	}
+	if cb.Trigger != "" {
+		metas = append(metas, Meta{Name: "Trigger", Value: cb.Trigger})
+	}
+	metas = append(metas,
+		Meta{Name: "Pre Tokens", Value: FormatTokens(cb.PreTokens)},
+		Meta{Name: "Post Tokens", Value: FormatTokens(cb.PostTokens)},
+	)
+	if cb.DroppedTokens > 0 {
+		metas = append(metas, Meta{Name: "Dropped", Value: FormatTokens(cb.DroppedTokens)})
+	}
+	return metas
 }
+
+func (cb *CompactBoundary) Usage() Usage { return Usage{} }
+
+type LocalCommand struct {
+	Time   time.Time
+	Input  string
+	Stdout string
+	Stderr string
+}
+
+func (lc *LocalCommand) Timestamp() time.Time { return lc.Time }
+
+func (lc *LocalCommand) Headline() string { return "$ " + lc.Input }
+
+func (lc *LocalCommand) Sections() []Section {
+	sections := []Section{{Label: "Command", Text: lc.Input}}
+	if lc.Stdout != "" {
+		sections = append(sections, Section{Label: "Stdout", Text: lc.Stdout})
+	}
+	if lc.Stderr != "" {
+		sections = append(sections, Section{Label: "Stderr", Text: lc.Stderr})
+	}
+	return sections
+}
+
+func (lc *LocalCommand) Metadata() []Meta { return nil }
+
+func (lc *LocalCommand) Usage() Usage { return Usage{} }
 
 type rawPreservedSegment struct {
 	AnchorUuid string `json:"anchorUuid"`
@@ -90,7 +133,7 @@ func extractTagContent(s, tag string) string {
 	return html.UnescapeString(strings.TrimSpace(s[start : start+end]))
 }
 
-func ParseTimeline(path string) ([]TimelineItem, error) {
+func ParseTimeline(path string) ([]TimelineEntry, error) {
 	lines, err := readLines(path)
 	if err != nil {
 		return nil, err
@@ -114,14 +157,14 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 	}
 
 	// second pass: build timeline
-	var items []TimelineItem
+	var items []TimelineEntry
 	var currentTurn *Turn
-	var lastTurn *Turn // last flushed turn, for post-compact orphan assistant messages
+	var lastTurn *Turn
 	var pendingLocalCmd *LocalCommand
 
 	flushTurn := func() {
 		if currentTurn != nil {
-			items = append(items, TimelineItem{Turn: currentTurn})
+			items = append(items, currentTurn)
 			lastTurn = currentTurn
 			currentTurn = nil
 		}
@@ -141,21 +184,21 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 			ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
 			summary := summaries[entry.CompactMetadata.PreservedSegment.AnchorUuid]
 			if summary != "" && lastTurn != nil {
-				lastTurn.Assistant = append(lastTurn.Assistant, Message{
+				lastTurn.AssistantMsgs = append(lastTurn.AssistantMsgs, Message{
 					Role:      RoleAssistant,
 					Content:   summary,
 					Timestamp: ts,
 				})
 			}
-			items = append(items, TimelineItem{CompactBoundary: &CompactBoundary{
-				Timestamp:     ts,
+			items = append(items, &CompactBoundary{
+				Time:          ts,
 				Trigger:       entry.CompactMetadata.Trigger,
 				PreTokens:     entry.CompactMetadata.PreTokens,
 				PostTokens:    entry.CompactMetadata.PostTokens,
 				DroppedTokens: entry.CompactMetadata.CumulativeDroppedTokens,
 				DurationMs:    entry.CompactMetadata.DurationMs,
 				Summary:       summary,
-			}})
+			})
 			continue
 		}
 
@@ -175,7 +218,6 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 			continue
 		}
 
-		// local command handling (user entries only)
 		if entry.Type == "user" {
 			if strings.HasPrefix(content, "<local-command-caveat>") ||
 				strings.HasPrefix(content, "<command-message>") ||
@@ -188,19 +230,17 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 			if strings.Contains(content, "<bash-input>") {
 				ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
 				pendingLocalCmd = &LocalCommand{
-					Timestamp: ts,
-					Input:     extractTagContent(content, "bash-input"),
+					Time:  ts,
+					Input: extractTagContent(content, "bash-input"),
 				}
 				continue
 			}
 			if strings.Contains(content, "<bash-stdout>") || strings.Contains(content, "<bash-stderr>") {
-				stdout := extractTagContent(content, "bash-stdout")
-				stderr := extractTagContent(content, "bash-stderr")
 				if pendingLocalCmd != nil {
-					pendingLocalCmd.Stdout = stdout
-					pendingLocalCmd.Stderr = stderr
+					pendingLocalCmd.Stdout = extractTagContent(content, "bash-stdout")
+					pendingLocalCmd.Stderr = extractTagContent(content, "bash-stderr")
 					flushTurn()
-					items = append(items, TimelineItem{LocalCommand: pendingLocalCmd})
+					items = append(items, pendingLocalCmd)
 					pendingLocalCmd = nil
 				}
 				continue
@@ -225,20 +265,19 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 		switch msg.Role {
 		case RoleUser:
 			flushTurn()
-			currentTurn = &Turn{User: msg}
+			currentTurn = &Turn{UserMsg: msg}
 		case RoleAssistant:
 			if currentTurn != nil {
-				currentTurn.Assistant = append(currentTurn.Assistant, msg)
+				currentTurn.AssistantMsgs = append(currentTurn.AssistantMsgs, msg)
 			} else if lastTurn != nil {
-				// compact 後など currentTurn が nil のとき、直前のターンに追加する
-				lastTurn.Assistant = append(lastTurn.Assistant, msg)
+				lastTurn.AssistantMsgs = append(lastTurn.AssistantMsgs, msg)
 			}
 		}
 	}
 
 	if pendingLocalCmd != nil {
 		flushTurn()
-		items = append(items, TimelineItem{LocalCommand: pendingLocalCmd})
+		items = append(items, pendingLocalCmd)
 	}
 	flushTurn()
 

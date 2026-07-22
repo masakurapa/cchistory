@@ -33,11 +33,11 @@ func newRoot(projectDir string, sessions []types.Session) *root {
 func (r *root) initListWidget(projectDir string, sessions []types.Session) {
 	r.list.SetSessions(sessions)
 	r.list.SetOnSelected(func(ctx *guigui.Context, session types.Session) {
-		items, err := types.ParseTimeline(filepath.Join(projectDir, session.ID+".jsonl"))
+		d, err := types.ParseSessionDetail(filepath.Join(projectDir, session.ID+".jsonl"), session)
 		if err != nil {
 			return
 		}
-		r.detail.SetData(session, items)
+		r.detail.SetData(d)
 		r.current = r.detail
 	})
 }

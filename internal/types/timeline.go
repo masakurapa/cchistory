@@ -19,7 +19,8 @@ type CompactBoundary struct {
 	Summary       string
 }
 
-func (cb *CompactBoundary) Timestamp() time.Time { return cb.Time }
+func (cb *CompactBoundary) Timestamp() time.Time    { return cb.Time }
+func (cb *CompactBoundary) EndTimestamp() time.Time { return cb.Time }
 
 func (cb *CompactBoundary) Headline() string { return "auto compacting" }
 
@@ -56,7 +57,8 @@ type LocalCommand struct {
 	Stderr string
 }
 
-func (lc *LocalCommand) Timestamp() time.Time { return lc.Time }
+func (lc *LocalCommand) Timestamp() time.Time    { return lc.Time }
+func (lc *LocalCommand) EndTimestamp() time.Time { return lc.Time }
 
 func (lc *LocalCommand) Headline() string { return "$ " + lc.Input }
 

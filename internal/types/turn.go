@@ -12,6 +12,13 @@ type Turn struct {
 
 func (t Turn) Timestamp() time.Time { return t.UserMsg.Timestamp }
 
+func (t Turn) EndTimestamp() time.Time {
+	if ft := t.finishedAt(); !ft.IsZero() {
+		return ft
+	}
+	return t.UserMsg.Timestamp
+}
+
 func (t Turn) Headline() string {
 	line := t.UserMsg.Content
 	if i := strings.IndexByte(line, '\n'); i >= 0 {
@@ -32,6 +39,7 @@ func (t Turn) Metadata() []Meta {
 	var metas []Meta
 	if ft := t.finishedAt(); !ft.IsZero() {
 		metas = append(metas, Meta{Name: "Finished", Value: ft.Local().Format("2006-01-02 15:04:05")})
+		metas = append(metas, Meta{Name: "Response Time", Value: FormatDuration(ft.Sub(t.UserMsg.Timestamp))})
 	}
 	if m := t.model(); m != "" {
 		metas = append(metas, Meta{Name: "Model", Value: m})

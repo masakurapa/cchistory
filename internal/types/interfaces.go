@@ -14,6 +14,7 @@ type Section struct {
 
 type TimelineEntry interface {
 	Timestamp() time.Time
+	EndTimestamp() time.Time
 	Headline() string
 	Sections() []Section
 	Metadata() []Meta

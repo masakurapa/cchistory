@@ -27,6 +27,7 @@ type Message struct {
 	Timestamp time.Time
 	Model     string
 	Effort    string
+	Thinking  bool
 	Usage     Usage
 }
 
@@ -47,6 +48,19 @@ type rawMessageBody struct {
 type rawContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
+}
+
+func hasThinkingBlock(raw json.RawMessage) bool {
+	var blocks []rawContentBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return false
+	}
+	for _, b := range blocks {
+		if b.Type == "thinking" {
+			return true
+		}
+	}
+	return false
 }
 
 func extractTextContent(raw json.RawMessage) string {

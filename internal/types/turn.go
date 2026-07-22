@@ -47,6 +47,9 @@ func (t Turn) Metadata() []Meta {
 	if e := t.effort(); e != "" {
 		metas = append(metas, Meta{Name: "Effort", Value: e})
 	}
+	if t.thinking() {
+		metas = append(metas, Meta{Name: "Thinking", Value: "ON"})
+	}
 	u := t.TotalUsage()
 	ctx := u.InputTokens + u.CacheReadInputTokens + u.CacheCreationInputTokens
 	metas = append(metas,
@@ -114,5 +117,14 @@ func (t Turn) effort() string {
 		}
 	}
 	return ""
+}
+
+func (t Turn) thinking() bool {
+	for _, a := range t.AssistantMsgs {
+		if a.Thinking {
+			return true
+		}
+	}
+	return false
 }
 

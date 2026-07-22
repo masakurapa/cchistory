@@ -256,6 +256,7 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 			Timestamp: ts,
 			Model:     body.Model,
 			Effort:    entry.Effort,
+			Thinking:  hasThinkingBlock(body.Content),
 			Usage: Usage{
 				InputTokens:              body.Usage.InputTokens,
 				OutputTokens:             body.Usage.OutputTokens,

@@ -201,6 +201,8 @@ type entryDetailWidget struct {
 }
 
 func (w *entryDetailWidget) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
+	w.metaForm.metas = w.entry.Metadata()
+	adder.AddWidget(&w.metaForm)
 	secs := w.entry.Sections()
 	w.sectionCount = len(secs)
 	w.sections.SetLen(w.sectionCount)
@@ -209,22 +211,20 @@ func (w *entryDetailWidget) Build(_ *guigui.Context, adder *guigui.ChildAdder) e
 		sw.set(s.Label, s.Text)
 		adder.AddWidget(sw)
 	}
-	w.metaForm.metas = w.entry.Metadata()
-	adder.AddWidget(&w.metaForm)
 	return nil
 }
 
 func (w *entryDetailWidget) layout(ctx *guigui.Context) guigui.LinearLayout {
 	u := basicwidget.UnitSize(ctx)
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
+	w.layoutItems = append(w.layoutItems,
+		guigui.LinearLayoutItem{Widget: &w.metaForm},
+	)
 	for i := range w.sectionCount {
 		w.layoutItems = append(w.layoutItems,
 			guigui.LinearLayoutItem{Widget: w.sections.At(i)},
 		)
 	}
-	w.layoutItems = append(w.layoutItems,
-		guigui.LinearLayoutItem{Widget: &w.metaForm},
-	)
 	return guigui.LinearLayout{
 		Direction: guigui.LayoutDirectionVertical,
 		Items:     w.layoutItems,

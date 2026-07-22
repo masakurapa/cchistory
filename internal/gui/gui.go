@@ -16,7 +16,7 @@ type Widget interface {
 func Run(projectDir string, sessions []types.Session) error {
 	return guigui.Run(newRoot(projectDir, sessions), &guigui.RunOptions{
 		Title:         projectDir + " - cchistory",
-		WindowMinSize: image.Pt(960, 600),
+		WindowMinSize: image.Pt(1280, 800),
 		AppScale:      1.5,
 	})
 }

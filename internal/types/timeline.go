@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"html"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 type CompactBoundary struct {
 	Time          time.Time
@@ -22,7 +25,12 @@ type CompactBoundary struct {
 func (cb *CompactBoundary) Timestamp() time.Time    { return cb.Time }
 func (cb *CompactBoundary) EndTimestamp() time.Time { return cb.Time }
 
-func (cb *CompactBoundary) Headline() string { return "auto compacting" }
+func (cb *CompactBoundary) Headline() string {
+	if cb.Trigger == "manual" || cb.Trigger == "user" {
+		return "manual compacting"
+	}
+	return "auto compacting"
+}
 
 func (cb *CompactBoundary) Sections() []Section {
 	if cb.Summary == "" {
@@ -74,6 +82,27 @@ func (lc *LocalCommand) Sections() []Section {
 }
 
 func (lc *LocalCommand) Metadata() []Meta { return nil }
+
+type SlashCommand struct {
+	Time   time.Time
+	Name   string
+	Stdout string
+}
+
+func (sc *SlashCommand) Timestamp() time.Time    { return sc.Time }
+func (sc *SlashCommand) EndTimestamp() time.Time { return sc.Time }
+func (sc *SlashCommand) Headline() string        { return sc.Name }
+
+func (sc *SlashCommand) Sections() []Section {
+	sections := []Section{{Label: "Command", Text: sc.Name}}
+	if sc.Stdout != "" {
+		sections = append(sections, Section{Label: "Output", Text: sc.Stdout})
+	}
+	return sections
+}
+
+func (sc *SlashCommand) Metadata() []Meta { return nil }
+func (sc *SlashCommand) Usage() Usage     { return Usage{} }
 
 func (lc *LocalCommand) Usage() Usage { return Usage{} }
 
@@ -163,6 +192,7 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 	var currentTurn *Turn
 	var lastTurn *Turn
 	var pendingLocalCmd *LocalCommand
+	var pendingSlashCmd *SlashCommand
 
 	flushTurn := func() {
 		if currentTurn != nil {
@@ -182,6 +212,12 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 		}
 
 		if entry.Type == "system" && entry.Subtype == "compact_boundary" {
+			// Discard slash command turns with no assistant response — they'll be
+			// replayed in <command-name> format in the preserved context.
+			if currentTurn != nil && len(currentTurn.AssistantMsgs) == 0 &&
+				strings.HasPrefix(currentTurn.UserMsg.Content, "/") {
+				currentTurn = nil
+			}
 			flushTurn()
 			ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
 			summary := summaries[entry.CompactMetadata.PreservedSegment.AnchorUuid]
@@ -232,10 +268,25 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 		if entry.Type == "user" {
 			if strings.HasPrefix(content, "<local-command-caveat>") ||
 				strings.HasPrefix(content, "<command-message>") ||
-				strings.HasPrefix(content, "<command-name>") ||
-				strings.HasPrefix(content, "<command-args>") ||
-				strings.HasPrefix(content, "<local-command-stdout>") ||
-				strings.HasPrefix(content, "<local-command-stderr>") {
+				strings.HasPrefix(content, "<command-args>") {
+				continue
+			}
+			if strings.Contains(content, "<command-name>") {
+				ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
+				pendingSlashCmd = &SlashCommand{
+					Time: ts,
+					Name: extractTagContent(content, "command-name"),
+				}
+				continue
+			}
+			if strings.HasPrefix(content, "<local-command-stdout>") || strings.HasPrefix(content, "<local-command-stderr>") {
+				if pendingSlashCmd != nil {
+					out := ansiEscape.ReplaceAllString(extractTagContent(content, "local-command-stdout"), "")
+					pendingSlashCmd.Stdout = strings.TrimSpace(out)
+					flushTurn()
+					items = append(items, pendingSlashCmd)
+					pendingSlashCmd = nil
+				}
 				continue
 			}
 			if strings.Contains(content, "<bash-input>") {

@@ -12,21 +12,20 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 		return SessionDetail{}, err
 	}
 
-	var lastInput, output, cacheRead, cacheCreation int
+	var totalOutput int
+	var last Usage
 	for _, entry := range items {
 		u := entry.Usage()
-		if u.InputTokens > 0 {
-			lastInput = u.InputTokens
+		if u.InputTokens+u.CacheReadInputTokens+u.CacheCreationInputTokens > 0 {
+			last = u
 		}
-		output += u.OutputTokens
-		cacheRead += u.CacheReadInputTokens
-		cacheCreation += u.CacheCreationInputTokens
+		totalOutput += u.OutputTokens
 	}
 	total := Usage{
-		InputTokens:              lastInput,
-		OutputTokens:             output,
-		CacheReadInputTokens:     cacheRead,
-		CacheCreationInputTokens: cacheCreation,
+		InputTokens:              last.InputTokens,
+		OutputTokens:             totalOutput,
+		CacheReadInputTokens:     last.CacheReadInputTokens,
+		CacheCreationInputTokens: last.CacheCreationInputTokens,
 	}
 
 	title := session.ID
@@ -34,9 +33,10 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 		title = session.Name
 	}
 
+	ctx := total.InputTokens + total.CacheReadInputTokens + total.CacheCreationInputTokens
 	metas := []Meta{
 		{Name: "ID", Value: session.ID},
-		{Name: "Input Token", Value: FormatTokens(total.InputTokens)},
+		{Name: "Context", Value: FormatTokens(ctx)},
 		{Name: "Output Token", Value: FormatTokens(total.OutputTokens)},
 	}
 	if total.CacheReadInputTokens > 0 {

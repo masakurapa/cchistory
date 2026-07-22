@@ -40,8 +40,9 @@ func (t Turn) Metadata() []Meta {
 		metas = append(metas, Meta{Name: "Effort", Value: e})
 	}
 	u := t.TotalUsage()
+	ctx := u.InputTokens + u.CacheReadInputTokens + u.CacheCreationInputTokens
 	metas = append(metas,
-		Meta{Name: "Input Token", Value: FormatTokens(u.InputTokens)},
+		Meta{Name: "Context", Value: FormatTokens(ctx)},
 		Meta{Name: "Output Token", Value: FormatTokens(u.OutputTokens)},
 	)
 	if u.CacheReadInputTokens > 0 {
@@ -56,20 +57,19 @@ func (t Turn) Metadata() []Meta {
 func (t Turn) Usage() Usage { return t.TotalUsage() }
 
 func (t Turn) TotalUsage() Usage {
-	var lastInput, output, cacheRead, cacheCreation int
+	var output int
+	var last Usage
 	for _, a := range t.AssistantMsgs {
-		if a.Usage.InputTokens > 0 {
-			lastInput = a.Usage.InputTokens
+		if a.Usage.InputTokens+a.Usage.CacheReadInputTokens+a.Usage.CacheCreationInputTokens > 0 {
+			last = a.Usage
 		}
 		output += a.Usage.OutputTokens
-		cacheRead += a.Usage.CacheReadInputTokens
-		cacheCreation += a.Usage.CacheCreationInputTokens
 	}
 	return Usage{
-		InputTokens:              lastInput,
+		InputTokens:              last.InputTokens,
 		OutputTokens:             output,
-		CacheReadInputTokens:     cacheRead,
-		CacheCreationInputTokens: cacheCreation,
+		CacheReadInputTokens:     last.CacheReadInputTokens,
+		CacheCreationInputTokens: last.CacheCreationInputTokens,
 	}
 }
 

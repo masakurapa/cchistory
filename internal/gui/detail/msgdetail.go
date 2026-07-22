@@ -89,8 +89,8 @@ func (w *entryListRow) HandlePointingInput(_ *guigui.Context, wb *guigui.WidgetB
 	return guigui.HandleInputResult{}
 }
 
-// turnListContent is the scrollable content of the left panel.
-type turnListContent struct {
+// timelineListContent is the scrollable content of the left panel.
+type timelineListContent struct {
 	guigui.DefaultWidget
 	items       []types.TimelineEntry
 	selectedIdx int
@@ -101,7 +101,7 @@ type turnListContent struct {
 	layoutItems []guigui.LinearLayoutItem
 }
 
-func (w *turnListContent) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
+func (w *timelineListContent) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
 	n := len(w.items)
 	w.rows.SetLen(n)
 	w.dividers.SetLen(max(0, n-1))
@@ -120,7 +120,7 @@ func (w *turnListContent) Build(_ *guigui.Context, adder *guigui.ChildAdder) err
 	return nil
 }
 
-func (w *turnListContent) layout(ctx *guigui.Context) guigui.LinearLayout {
+func (w *timelineListContent) layout(ctx *guigui.Context) guigui.LinearLayout {
 	u := basicwidget.UnitSize(ctx)
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
 	for i := range w.items {
@@ -140,11 +140,11 @@ func (w *turnListContent) layout(ctx *guigui.Context) guigui.LinearLayout {
 	}
 }
 
-func (w *turnListContent) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+func (w *timelineListContent) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
 	w.layout(ctx).LayoutWidgets(ctx, wb.Bounds(), layouter)
 }
 
-func (w *turnListContent) Measure(ctx *guigui.Context, constraints guigui.Constraints) image.Point {
+func (w *timelineListContent) Measure(ctx *guigui.Context, constraints guigui.Constraints) image.Point {
 	return w.layout(ctx).Measure(ctx, constraints)
 }
 
@@ -192,7 +192,8 @@ func (w *sectionWidget) Measure(ctx *guigui.Context, constraints guigui.Constrai
 // entryDetailWidget renders the full detail of any TimelineEntry.
 type entryDetailWidget struct {
 	guigui.DefaultWidget
-	entry    types.TimelineEntry
+	entry        types.TimelineEntry
+	sectionCount int
 
 	sections    guigui.WidgetSlice[*sectionWidget]
 	metaForm    metaFormWidget
@@ -201,7 +202,8 @@ type entryDetailWidget struct {
 
 func (w *entryDetailWidget) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
 	secs := w.entry.Sections()
-	w.sections.SetLen(len(secs))
+	w.sectionCount = len(secs)
+	w.sections.SetLen(w.sectionCount)
 	for i, s := range secs {
 		sw := w.sections.At(i)
 		sw.set(s.Label, s.Text)
@@ -215,8 +217,7 @@ func (w *entryDetailWidget) Build(_ *guigui.Context, adder *guigui.ChildAdder) e
 func (w *entryDetailWidget) layout(ctx *guigui.Context) guigui.LinearLayout {
 	u := basicwidget.UnitSize(ctx)
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
-	secs := w.entry.Sections()
-	for i := range secs {
+	for i := range w.sectionCount {
 		w.layoutItems = append(w.layoutItems,
 			guigui.LinearLayoutItem{Widget: w.sections.At(i)},
 		)
@@ -249,7 +250,7 @@ type msgDetailWidget struct {
 
 	backButton  basicwidget.Button
 	leftPanel   basicwidget.Panel
-	listContent turnListContent
+	listContent timelineListContent
 	rightPanel  basicwidget.Panel
 	rightContent entryDetailWidget
 	divider     coloredDivider

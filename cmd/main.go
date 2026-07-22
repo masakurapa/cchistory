@@ -5,7 +5,6 @@ import (
 
 	"github.com/masakurapa/cchistory/internal/cc"
 	"github.com/masakurapa/cchistory/internal/gui"
-	"github.com/masakurapa/cchistory/internal/types"
 )
 
 func main() {
@@ -14,23 +13,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sessions, err := loadSessions(paths)
-	if err != nil {
+	if err := gui.Run(projectDir, cc.LoadSessions(paths)); err != nil {
 		log.Fatal(err)
 	}
-	if err := gui.Run(projectDir, sessions); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func loadSessions(projectDirs []string) ([]types.Session, error) {
-	var sessions []types.Session
-	for _, f := range projectDirs {
-		s, err := types.ParseSession(f)
-		if err != nil {
-			continue
-		}
-		sessions = append(sessions, s)
-	}
-	return sessions, nil
 }

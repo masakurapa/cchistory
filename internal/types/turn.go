@@ -58,10 +58,7 @@ func (t Turn) Usage() Usage { return t.TotalUsage() }
 func (t Turn) TotalUsage() Usage {
 	var total Usage
 	for _, a := range t.AssistantMsgs {
-		total.InputTokens += a.Usage.InputTokens
-		total.OutputTokens += a.Usage.OutputTokens
-		total.CacheReadInputTokens += a.Usage.CacheReadInputTokens
-		total.CacheCreationInputTokens += a.Usage.CacheCreationInputTokens
+		total = total.Add(a.Usage)
 	}
 	return total
 }
@@ -101,21 +98,3 @@ func (t Turn) effort() string {
 	return ""
 }
 
-func ParseTurns(path string) ([]Turn, error) {
-	messages, err := ParseMessages(path)
-	if err != nil {
-		return nil, err
-	}
-	var turns []Turn
-	for _, msg := range messages {
-		switch msg.Role {
-		case RoleUser:
-			turns = append(turns, Turn{UserMsg: msg})
-		case RoleAssistant:
-			if len(turns) > 0 {
-				turns[len(turns)-1].AssistantMsgs = append(turns[len(turns)-1].AssistantMsgs, msg)
-			}
-		}
-	}
-	return turns, nil
-}

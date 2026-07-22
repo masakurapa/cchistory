@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/masakurapa/cchistory/internal/types"
 )
 
 func SessionFilePaths() (string, []string, error) {
@@ -17,11 +19,11 @@ func SessionFilePaths() (string, []string, error) {
 	}
 	dirName := strings.ReplaceAll(pwd, "/", "-")
 	prjDir := filepath.Join(home, ".claude", "projects", dirName)
-	paths, err := loadSessions(prjDir)
+	paths, err := sessionFilePaths(prjDir)
 	return prjDir, paths, err
 }
 
-func loadSessions(projectDir string) ([]string, error) {
+func sessionFilePaths(projectDir string) ([]string, error) {
 	files, err := os.ReadDir(projectDir)
 	if err != nil {
 		return nil, err
@@ -35,4 +37,16 @@ func loadSessions(projectDir string) ([]string, error) {
 		paths = append(paths, p)
 	}
 	return paths, nil
+}
+
+func LoadSessions(paths []string) []types.Session {
+	var sessions []types.Session
+	for _, p := range paths {
+		s, err := types.ParseSession(p)
+		if err != nil {
+			continue
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions
 }

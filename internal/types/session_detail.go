@@ -14,11 +14,7 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 
 	var total Usage
 	for _, entry := range items {
-		u := entry.Usage()
-		total.InputTokens += u.InputTokens
-		total.OutputTokens += u.OutputTokens
-		total.CacheReadInputTokens += u.CacheReadInputTokens
-		total.CacheCreationInputTokens += u.CacheCreationInputTokens
+		total = total.Add(entry.Usage())
 	}
 
 	title := session.ID

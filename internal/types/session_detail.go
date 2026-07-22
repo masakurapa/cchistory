@@ -36,14 +36,14 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 	ctx := total.InputTokens + total.CacheReadInputTokens + total.CacheCreationInputTokens
 	metas := []Meta{
 		{Name: "ID", Value: session.ID},
-		{Name: "Context", Value: FormatTokens(ctx)},
+		{Name: "Context Token", Value: FormatTokens(ctx)},
 		{Name: "Output Token", Value: FormatTokens(total.OutputTokens)},
 	}
 	if total.CacheReadInputTokens > 0 {
-		metas = append(metas, Meta{Name: "Cache Read", Value: FormatTokens(total.CacheReadInputTokens)})
+		metas = append(metas, Meta{Name: "Cache Read Token", Value: FormatTokens(total.CacheReadInputTokens)})
 	}
 	if total.CacheCreationInputTokens > 0 {
-		metas = append(metas, Meta{Name: "Cache Creation", Value: FormatTokens(total.CacheCreationInputTokens)})
+		metas = append(metas, Meta{Name: "Cache Creation Token", Value: FormatTokens(total.CacheCreationInputTokens)})
 	}
 
 	return SessionDetail{

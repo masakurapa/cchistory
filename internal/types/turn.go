@@ -42,14 +42,14 @@ func (t Turn) Metadata() []Meta {
 	u := t.TotalUsage()
 	ctx := u.InputTokens + u.CacheReadInputTokens + u.CacheCreationInputTokens
 	metas = append(metas,
-		Meta{Name: "Context", Value: FormatTokens(ctx)},
+		Meta{Name: "Context Token", Value: FormatTokens(ctx)},
 		Meta{Name: "Output Token", Value: FormatTokens(u.OutputTokens)},
 	)
 	if u.CacheReadInputTokens > 0 {
-		metas = append(metas, Meta{Name: "Cache Read", Value: FormatTokens(u.CacheReadInputTokens)})
+		metas = append(metas, Meta{Name: "Cache Read Token", Value: FormatTokens(u.CacheReadInputTokens)})
 	}
 	if u.CacheCreationInputTokens > 0 {
-		metas = append(metas, Meta{Name: "Cache Creation", Value: FormatTokens(u.CacheCreationInputTokens)})
+		metas = append(metas, Meta{Name: "Cache Creation Token", Value: FormatTokens(u.CacheCreationInputTokens)})
 	}
 	return metas
 }

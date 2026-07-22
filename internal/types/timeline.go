@@ -115,11 +115,13 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 	// second pass: build timeline
 	var items []TimelineItem
 	var currentTurn *Turn
+	var lastTurn *Turn // last flushed turn, for post-compact orphan assistant messages
 	var pendingLocalCmd *LocalCommand
 
 	flushTurn := func() {
 		if currentTurn != nil {
 			items = append(items, TimelineItem{Turn: currentTurn})
+			lastTurn = currentTurn
 			currentTurn = nil
 		}
 	}
@@ -136,6 +138,14 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 		if entry.Type == "system" && entry.Subtype == "compact_boundary" {
 			flushTurn()
 			ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
+			summary := summaries[entry.CompactMetadata.PreservedSegment.AnchorUuid]
+			if summary != "" && lastTurn != nil {
+				lastTurn.Assistant = append(lastTurn.Assistant, Message{
+					Role:      RoleAssistant,
+					Content:   summary,
+					Timestamp: ts,
+				})
+			}
 			items = append(items, TimelineItem{CompactBoundary: &CompactBoundary{
 				Timestamp:     ts,
 				Trigger:       entry.CompactMetadata.Trigger,
@@ -143,7 +153,7 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 				PostTokens:    entry.CompactMetadata.PostTokens,
 				DroppedTokens: entry.CompactMetadata.CumulativeDroppedTokens,
 				DurationMs:    entry.CompactMetadata.DurationMs,
-				Summary:       summaries[entry.CompactMetadata.PreservedSegment.AnchorUuid],
+				Summary:       summary,
 			}})
 			continue
 		}
@@ -218,6 +228,9 @@ func ParseTimeline(path string) ([]TimelineItem, error) {
 		case RoleAssistant:
 			if currentTurn != nil {
 				currentTurn.Assistant = append(currentTurn.Assistant, msg)
+			} else if lastTurn != nil {
+				// compact 後など currentTurn が nil のとき、直前のターンに追加する
+				lastTurn.Assistant = append(lastTurn.Assistant, msg)
 			}
 		}
 	}

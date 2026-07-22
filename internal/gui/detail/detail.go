@@ -1,101 +1,54 @@
 package detail
 
 import (
-	"slices"
-
 	"github.com/guigui-gui/guigui"
-	"github.com/guigui-gui/guigui/basicwidget"
 	"github.com/masakurapa/cchistory/internal/types"
 )
+
+type view interface {
+	Build(*guigui.Context, *guigui.ChildAdder) error
+	Layout(*guigui.Context, *guigui.WidgetBounds, *guigui.ChildLayouter)
+}
 
 type Widget struct {
 	guigui.DefaultWidget
 
-	session types.Session
-	items   []types.TimelineItem
-	onBack  func(*guigui.Context)
+	summaryView summaryViewWidget
+	msgDetail   msgDetailWidget
+	current     view
 
-	backButton  basicwidget.Button
-	titleText   basicwidget.Text
-	summaryForm summaryFormWidget
-	panel       basicwidget.Panel
-	msgList     msgListWidget
-	layoutItems []guigui.LinearLayoutItem
-	headerItems []guigui.LinearLayoutItem
+	onBack func(*guigui.Context)
 }
 
 func New() *Widget {
-	return &Widget{}
+	w := &Widget{}
+	w.current = &w.summaryView
+	return w
 }
 
 func (w *Widget) SetData(session types.Session, items []types.TimelineItem) {
-	w.session = session
-	w.items = items
+	w.summaryView.setData(session, items)
+	w.summaryView.onBack = w.onBack
+	w.summaryView.onMsgDetail = func(ctx *guigui.Context) {
+		w.msgDetail.items = items
+		w.msgDetail.selectedItemIdx = -1
+		w.msgDetail.onBack = func(ctx *guigui.Context) {
+			w.current = &w.summaryView
+		}
+		w.current = &w.msgDetail
+	}
+	w.current = &w.summaryView
 }
 
 func (w *Widget) SetOnBack(fn func(*guigui.Context)) {
 	w.onBack = fn
+	w.summaryView.onBack = fn
 }
 
-func (w *Widget) Build(context *guigui.Context, adder *guigui.ChildAdder) error {
-	adder.AddWidget(&w.backButton)
-	adder.AddWidget(&w.titleText)
-	adder.AddWidget(&w.panel)
-
-	w.backButton.SetText("← Back")
-	w.backButton.OnDown(w.onBack)
-
-	title := w.session.ID
-	if name := w.session.Name; name != "" {
-		title = name
-	}
-	w.titleText.SetValue(title)
-	w.titleText.SetBold(true)
-
-	var total types.Usage
-	for _, item := range w.items {
-		if item.Turn != nil {
-			u := item.Turn.TotalUsage()
-			total.InputTokens += u.InputTokens
-			total.OutputTokens += u.OutputTokens
-			total.CacheReadInputTokens += u.CacheReadInputTokens
-			total.CacheCreationInputTokens += u.CacheCreationInputTokens
-		}
-	}
-	w.summaryForm.sessionID = w.session.ID
-	w.summaryForm.total = total
-
-	w.msgList.summaryForm = &w.summaryForm
-	w.msgList.items = w.items
-	w.panel.SetContent(&w.msgList)
-	w.panel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)
-
-	return nil
+func (w *Widget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) error {
+	return w.current.Build(ctx, adder)
 }
 
-func (w *Widget) Layout(context *guigui.Context, widgetBounds *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
-	u := basicwidget.UnitSize(context)
-
-	w.headerItems = slices.Delete(w.headerItems, 0, len(w.headerItems))
-	w.headerItems = append(w.headerItems,
-		guigui.LinearLayoutItem{Widget: &w.backButton, Size: guigui.FixedSize(u * 3)},
-		guigui.LinearLayoutItem{Widget: &w.titleText, Size: guigui.FlexibleSize(1)},
-	)
-	header := guigui.LinearLayout{
-		Direction: guigui.LayoutDirectionHorizontal,
-		Items:     w.headerItems,
-		Gap:       u / 2,
-	}
-
-	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
-	w.layoutItems = append(w.layoutItems,
-		guigui.LinearLayoutItem{Layout: &header, Size: guigui.FixedSize(u)},
-		guigui.LinearLayoutItem{Widget: &w.panel, Size: guigui.FlexibleSize(1)},
-	)
-	(guigui.LinearLayout{
-		Direction: guigui.LayoutDirectionVertical,
-		Items:     w.layoutItems,
-		Gap:       u / 2,
-		Padding:   guigui.Padding{Start: u / 2, Top: u / 2, End: u / 2, Bottom: u / 2},
-	}).LayoutWidgets(context, widgetBounds.Bounds(), layouter)
+func (w *Widget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	w.current.Layout(ctx, wb, layouter)
 }

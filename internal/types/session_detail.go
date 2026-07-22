@@ -52,6 +52,9 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 	metas := []Meta{
 		{Name: "ID", Value: session.ID},
 	}
+	if session.Name != "" {
+		metas = append(metas, Meta{Name: "Name", Value: session.Name})
+	}
 	if !start.IsZero() {
 		metas = append(metas, Meta{Name: "Started", Value: start.Local().Format("2006-01-02 15:04:05")})
 	}

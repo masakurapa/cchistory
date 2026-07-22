@@ -158,6 +158,64 @@ func (w *compactBoundaryRow) HandlePointingInput(_ *guigui.Context, wb *guigui.W
 	return guigui.HandleInputResult{}
 }
 
+// localCmdRow is a 2-line clickable row for local command entries.
+type localCmdRow struct {
+	guigui.DefaultWidget
+	cmd            types.LocalCommand
+	itemIdx        int
+	selectedIdxPtr *int
+	onSelected     func(itemIdx int)
+
+	dateText basicwidget.Text
+	msgText  basicwidget.Text
+}
+
+func (w *localCmdRow) WriteStateKey(_ *guigui.Context, sw *guigui.StateKeyWriter) {
+	sw.WriteBool(w.selectedIdxPtr != nil && *w.selectedIdxPtr == w.itemIdx)
+}
+
+func (w *localCmdRow) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
+	w.dateText.SetValue(w.cmd.Timestamp.Local().Format("2006-01-02 15:04"))
+	w.msgText.SetValue("$ " + w.cmd.Input)
+	adder.AddWidget(&w.dateText)
+	adder.AddWidget(&w.msgText)
+	return nil
+}
+
+func (w *localCmdRow) Draw(_ *guigui.Context, wb *guigui.WidgetBounds, dst *ebiten.Image) {
+	if w.selectedIdxPtr != nil && *w.selectedIdxPtr == w.itemIdx {
+		dst.SubImage(wb.Bounds()).(*ebiten.Image).Fill(color.RGBA{R: 180, G: 180, B: 180, A: 80})
+	}
+}
+
+func (w *localCmdRow) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	u := basicwidget.UnitSize(ctx)
+	b := wb.Bounds()
+	hPad := u / 4
+	mid := b.Min.Y + u
+	layouter.LayoutWidget(&w.dateText, image.Rect(b.Min.X+hPad, b.Min.Y, b.Max.X-hPad, mid))
+	layouter.LayoutWidget(&w.msgText, image.Rect(b.Min.X+hPad, mid, b.Max.X-hPad, b.Max.Y))
+}
+
+func (w *localCmdRow) Measure(ctx *guigui.Context, constraints guigui.Constraints) image.Point {
+	u := basicwidget.UnitSize(ctx)
+	width, ok := constraints.FixedWidth()
+	if !ok {
+		width = 400
+	}
+	return image.Pt(width, u*2)
+}
+
+func (w *localCmdRow) HandlePointingInput(_ *guigui.Context, wb *guigui.WidgetBounds) guigui.HandleInputResult {
+	if wb.IsHitAtCursor() && inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+		if w.onSelected != nil {
+			w.onSelected(w.itemIdx)
+		}
+		return guigui.HandleInputByWidget(w)
+	}
+	return guigui.HandleInputResult{}
+}
+
 // turnListContent is the scrollable content of the left panel.
 type turnListContent struct {
 	guigui.DefaultWidget
@@ -167,31 +225,35 @@ type turnListContent struct {
 
 	rows         guigui.WidgetSlice[*turnListRow]
 	compactRows  guigui.WidgetSlice[*compactBoundaryRow]
+	localCmdRows guigui.WidgetSlice[*localCmdRow]
 	dividers     guigui.WidgetSlice[*basicwidget.Divider]
 	layoutItems  []guigui.LinearLayoutItem
 }
 
-func (w *turnListContent) rowCounts() (turns, compacts int) {
+func (w *turnListContent) rowCounts() (turns, compacts, cmds int) {
 	for _, item := range w.items {
 		if item.Turn != nil {
 			turns++
 		} else if item.CompactBoundary != nil {
 			compacts++
+		} else if item.LocalCommand != nil {
+			cmds++
 		}
 	}
 	return
 }
 
 func (w *turnListContent) Build(ctx *guigui.Context, adder *guigui.ChildAdder) error {
-	turns, compacts := w.rowCounts()
-	total := turns + compacts
+	turns, compacts, cmds := w.rowCounts()
+	total := turns + compacts + cmds
 	w.rows.SetLen(turns)
 	w.compactRows.SetLen(compacts)
+	w.localCmdRows.SetLen(cmds)
 	w.dividers.SetLen(max(0, total-1))
 
-	ri, ci, di, total2 := 0, 0, 0, 0
+	ri, ci, li, di, total2 := 0, 0, 0, 0, 0
 	for i, item := range w.items {
-		if item.Turn == nil && item.CompactBoundary == nil {
+		if item.Turn == nil && item.CompactBoundary == nil && item.LocalCommand == nil {
 			continue
 		}
 		if total2 > 0 {
@@ -206,7 +268,7 @@ func (w *turnListContent) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 			row.onSelected = w.onSelected
 			adder.AddWidget(row)
 			ri++
-		} else {
+		} else if item.CompactBoundary != nil {
 			cr := w.compactRows.At(ci)
 			cr.cb = *item.CompactBoundary
 			cr.itemIdx = i
@@ -214,6 +276,14 @@ func (w *turnListContent) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 			cr.onSelected = w.onSelected
 			adder.AddWidget(cr)
 			ci++
+		} else {
+			lr := w.localCmdRows.At(li)
+			lr.cmd = *item.LocalCommand
+			lr.itemIdx = i
+			lr.selectedIdxPtr = &w.selectedIdx
+			lr.onSelected = w.onSelected
+			adder.AddWidget(lr)
+			li++
 		}
 		total2++
 	}
@@ -223,9 +293,9 @@ func (w *turnListContent) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 func (w *turnListContent) layout(ctx *guigui.Context) guigui.LinearLayout {
 	u := basicwidget.UnitSize(ctx)
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
-	ri, ci, di, total := 0, 0, 0, 0
+	ri, ci, li, di, total := 0, 0, 0, 0, 0
 	for _, item := range w.items {
-		if item.Turn == nil && item.CompactBoundary == nil {
+		if item.Turn == nil && item.CompactBoundary == nil && item.LocalCommand == nil {
 			continue
 		}
 		if total > 0 {
@@ -239,11 +309,16 @@ func (w *turnListContent) layout(ctx *guigui.Context) guigui.LinearLayout {
 				guigui.LinearLayoutItem{Widget: w.rows.At(ri)},
 			)
 			ri++
-		} else {
+		} else if item.CompactBoundary != nil {
 			w.layoutItems = append(w.layoutItems,
 				guigui.LinearLayoutItem{Widget: w.compactRows.At(ci)},
 			)
 			ci++
+		} else {
+			w.layoutItems = append(w.layoutItems,
+				guigui.LinearLayoutItem{Widget: w.localCmdRows.At(li)},
+			)
+			li++
 		}
 		total++
 	}
@@ -322,6 +397,75 @@ func (w *turnDetailWidget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, 
 }
 
 func (w *turnDetailWidget) Measure(ctx *guigui.Context, constraints guigui.Constraints) image.Point {
+	return w.layout(ctx).Measure(ctx, constraints)
+}
+
+// localCmdDetailWidget shows a local command's input/output in the right panel.
+type localCmdDetailWidget struct {
+	guigui.DefaultWidget
+	cmd types.LocalCommand
+
+	cmdLabel    basicwidget.Text
+	cmdArea     textAreaWidget
+	stdoutLabel basicwidget.Text
+	stdoutArea  textAreaWidget
+	stderrLabel basicwidget.Text
+	stderrArea  textAreaWidget
+	layoutItems []guigui.LinearLayoutItem
+}
+
+func (w *localCmdDetailWidget) Build(_ *guigui.Context, adder *guigui.ChildAdder) error {
+	w.cmdLabel.SetValue("Command:")
+	w.cmdArea.setText(w.cmd.Input)
+	adder.AddWidget(&w.cmdLabel)
+	adder.AddWidget(&w.cmdArea)
+	if w.cmd.Stdout != "" {
+		w.stdoutLabel.SetValue("Stdout:")
+		w.stdoutArea.setText(w.cmd.Stdout)
+		adder.AddWidget(&w.stdoutLabel)
+		adder.AddWidget(&w.stdoutArea)
+	}
+	if w.cmd.Stderr != "" {
+		w.stderrLabel.SetValue("Stderr:")
+		w.stderrArea.setText(w.cmd.Stderr)
+		adder.AddWidget(&w.stderrLabel)
+		adder.AddWidget(&w.stderrArea)
+	}
+	return nil
+}
+
+func (w *localCmdDetailWidget) layout(ctx *guigui.Context) guigui.LinearLayout {
+	u := basicwidget.UnitSize(ctx)
+	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
+	w.layoutItems = append(w.layoutItems,
+		guigui.LinearLayoutItem{Widget: &w.cmdLabel, Size: guigui.FixedSize(u)},
+		guigui.LinearLayoutItem{Widget: &w.cmdArea},
+	)
+	if w.cmd.Stdout != "" {
+		w.layoutItems = append(w.layoutItems,
+			guigui.LinearLayoutItem{Widget: &w.stdoutLabel, Size: guigui.FixedSize(u)},
+			guigui.LinearLayoutItem{Widget: &w.stdoutArea},
+		)
+	}
+	if w.cmd.Stderr != "" {
+		w.layoutItems = append(w.layoutItems,
+			guigui.LinearLayoutItem{Widget: &w.stderrLabel, Size: guigui.FixedSize(u)},
+			guigui.LinearLayoutItem{Widget: &w.stderrArea},
+		)
+	}
+	return guigui.LinearLayout{
+		Direction: guigui.LayoutDirectionVertical,
+		Items:     w.layoutItems,
+		Gap:       u / 4,
+		Padding:   guigui.Padding{Start: u / 2, Top: u / 2, End: u / 2, Bottom: u / 2},
+	}
+}
+
+func (w *localCmdDetailWidget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, layouter *guigui.ChildLayouter) {
+	w.layout(ctx).LayoutWidgets(ctx, wb.Bounds(), layouter)
+}
+
+func (w *localCmdDetailWidget) Measure(ctx *guigui.Context, constraints guigui.Constraints) image.Point {
 	return w.layout(ctx).Measure(ctx, constraints)
 }
 
@@ -408,10 +552,11 @@ type msgDetailWidget struct {
 	backButton      basicwidget.Button
 	leftPanel       basicwidget.Panel
 	listContent     turnListContent
-	rightPanel     basicwidget.Panel
-	rightContent   turnDetailWidget
-	compactContent compactDetailWidget
-	divider        coloredDivider
+	rightPanel      basicwidget.Panel
+	rightContent    turnDetailWidget
+	compactContent  compactDetailWidget
+	localCmdContent localCmdDetailWidget
+	divider         coloredDivider
 
 	headerItems []guigui.LinearLayoutItem
 	bodyItems   []guigui.LinearLayoutItem
@@ -445,6 +590,9 @@ func (w *msgDetailWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 		} else if item.CompactBoundary != nil {
 			w.compactContent.cb = *item.CompactBoundary
 			w.rightPanel.SetContent(&w.compactContent)
+		} else if item.LocalCommand != nil {
+			w.localCmdContent.cmd = *item.LocalCommand
+			w.rightPanel.SetContent(&w.localCmdContent)
 		} else {
 			w.rightPanel.SetContent(nil)
 		}

@@ -29,8 +29,17 @@ func (t Turn) Headline() string {
 
 func (t Turn) Sections() []Section {
 	sections := []Section{{Label: "User", Text: t.UserMsg.Content}}
-	if content := t.assistantContent(); content != "" {
-		sections = append(sections, Section{Label: "Assistant", Text: content})
+	for _, a := range t.AssistantMsgs {
+		if a.Content != "" {
+			sections = append(sections, Section{Label: "Assistant", Text: a.Content})
+		}
+		for _, tc := range a.ToolCalls {
+			text := tc.Input
+			if tc.Result != "" {
+				text += "\n\n" + tc.Result
+			}
+			sections = append(sections, Section{Label: tc.Name, Text: text})
+		}
 	}
 	return sections
 }
@@ -84,15 +93,6 @@ func (t Turn) TotalUsage() Usage {
 	}
 }
 
-func (t Turn) assistantContent() string {
-	var parts []string
-	for _, a := range t.AssistantMsgs {
-		if a.Content != "" {
-			parts = append(parts, a.Content)
-		}
-	}
-	return strings.Join(parts, "\n\n")
-}
 
 func (t Turn) finishedAt() time.Time {
 	if len(t.AssistantMsgs) == 0 {

@@ -215,6 +215,15 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 		if err := json.Unmarshal(entry.Message, &body); err != nil {
 			continue
 		}
+
+		// tool_result entries: attach results to last assistant message's tool calls
+		if entry.Type == "user" && hasToolResultBlocks(body.Content) {
+			if currentTurn != nil && len(currentTurn.AssistantMsgs) > 0 {
+				attachToolResults(&currentTurn.AssistantMsgs[len(currentTurn.AssistantMsgs)-1], body.Content)
+			}
+			continue
+		}
+
 		content := extractTextContent(body.Content)
 		if entry.Type == "user" && content == "" {
 			continue
@@ -257,6 +266,7 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 			Model:     body.Model,
 			Effort:    entry.Effort,
 			Thinking:  hasThinkingBlock(body.Content),
+			ToolCalls: extractToolCalls(body.Content),
 			Usage: Usage{
 				InputTokens:              body.Usage.InputTokens,
 				OutputTokens:             body.Usage.OutputTokens,

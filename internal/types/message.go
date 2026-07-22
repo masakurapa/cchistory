@@ -20,6 +20,12 @@ type Usage struct {
 	CacheCreationInputTokens int
 }
 
+type ToolCall struct {
+	ID     string
+	Name   string
+	Input  string
+	Result string
+}
 
 type Message struct {
 	Role      MessageRole
@@ -28,6 +34,7 @@ type Message struct {
 	Model     string
 	Effort    string
 	Thinking  bool
+	ToolCalls []ToolCall
 	Usage     Usage
 }
 
@@ -46,8 +53,44 @@ type rawMessageBody struct {
 }
 
 type rawContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	ToolUseID string          `json:"tool_use_id"`
+	Content   json.RawMessage `json:"content"`
+}
+
+var toolPrimaryField = map[string]string{
+	"Bash":      "command",
+	"Read":      "file_path",
+	"Edit":      "file_path",
+	"Write":     "file_path",
+	"WebSearch": "query",
+	"WebFetch":  "url",
+	"Grep":      "pattern",
+	"Glob":      "pattern",
+	"LS":        "path",
+	"Agent":     "description",
+}
+
+func formatToolInput(name string, raw json.RawMessage) string {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil || len(m) == 0 {
+		return strings.TrimSpace(string(raw))
+	}
+	if field, ok := toolPrimaryField[name]; ok {
+		if v, ok := m[field]; ok {
+			var s string
+			if err := json.Unmarshal(v, &s); err == nil {
+				return strings.TrimSpace(s)
+			}
+		}
+	}
+	b, _ := json.MarshalIndent(raw, "", "  ")
+	return string(b)
 }
 
 func hasThinkingBlock(raw json.RawMessage) bool {
@@ -61,6 +104,55 @@ func hasThinkingBlock(raw json.RawMessage) bool {
 		}
 	}
 	return false
+}
+
+func hasToolResultBlocks(raw json.RawMessage) bool {
+	var blocks []rawContentBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return false
+	}
+	for _, b := range blocks {
+		if b.Type == "tool_result" {
+			return true
+		}
+	}
+	return false
+}
+
+func extractToolCalls(raw json.RawMessage) []ToolCall {
+	var blocks []rawContentBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return nil
+	}
+	var calls []ToolCall
+	for _, b := range blocks {
+		if b.Type == "tool_use" {
+			calls = append(calls, ToolCall{
+				ID:    b.ID,
+				Name:  b.Name,
+				Input: formatToolInput(b.Name, b.Input),
+			})
+		}
+	}
+	return calls
+}
+
+func attachToolResults(msg *Message, raw json.RawMessage) {
+	var blocks []rawContentBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return
+	}
+	results := make(map[string]string, len(blocks))
+	for _, b := range blocks {
+		if b.Type == "tool_result" {
+			results[b.ToolUseID] = extractTextContent(b.Content)
+		}
+	}
+	for i := range msg.ToolCalls {
+		if r, ok := results[msg.ToolCalls[i].ID]; ok {
+			msg.ToolCalls[i].Result = r
+		}
+	}
 }
 
 func extractTextContent(raw json.RawMessage) string {

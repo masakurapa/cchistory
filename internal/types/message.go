@@ -20,14 +20,6 @@ type Usage struct {
 	CacheCreationInputTokens int
 }
 
-func (u Usage) Add(other Usage) Usage {
-	return Usage{
-		InputTokens:              u.InputTokens + other.InputTokens,
-		OutputTokens:             u.OutputTokens + other.OutputTokens,
-		CacheReadInputTokens:     u.CacheReadInputTokens + other.CacheReadInputTokens,
-		CacheCreationInputTokens: u.CacheCreationInputTokens + other.CacheCreationInputTokens,
-	}
-}
 
 type Message struct {
 	Role      MessageRole

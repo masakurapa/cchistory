@@ -214,7 +214,7 @@ func ParseTimeline(path string) ([]TimelineEntry, error) {
 			continue
 		}
 		content := extractTextContent(body.Content)
-		if content == "" {
+		if entry.Type == "user" && content == "" {
 			continue
 		}
 

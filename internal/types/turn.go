@@ -56,11 +56,21 @@ func (t Turn) Metadata() []Meta {
 func (t Turn) Usage() Usage { return t.TotalUsage() }
 
 func (t Turn) TotalUsage() Usage {
-	var total Usage
+	var lastInput, output, cacheRead, cacheCreation int
 	for _, a := range t.AssistantMsgs {
-		total = total.Add(a.Usage)
+		if a.Usage.InputTokens > 0 {
+			lastInput = a.Usage.InputTokens
+		}
+		output += a.Usage.OutputTokens
+		cacheRead += a.Usage.CacheReadInputTokens
+		cacheCreation += a.Usage.CacheCreationInputTokens
 	}
-	return total
+	return Usage{
+		InputTokens:              lastInput,
+		OutputTokens:             output,
+		CacheReadInputTokens:     cacheRead,
+		CacheCreationInputTokens: cacheCreation,
+	}
 }
 
 func (t Turn) assistantContent() string {

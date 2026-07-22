@@ -424,11 +424,11 @@ func (w *msgDetailWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 			w.compactContent.cb = *item.CompactBoundary
 			w.rightPanel.SetContent(&w.compactContent)
 		} else {
-			w.placeholder.SetValue("← メッセージを選択してください")
+			w.placeholder.SetValue("← Select a message")
 			w.rightPanel.SetContent(&w.placeholder)
 		}
 	} else {
-		w.placeholder.SetValue("← メッセージを選択してください")
+		w.placeholder.SetValue("← Select a message")
 		w.rightPanel.SetContent(&w.placeholder)
 	}
 	w.rightPanel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)

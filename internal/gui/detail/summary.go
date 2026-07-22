@@ -58,7 +58,7 @@ func (w *summaryViewWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder)
 	w.titleText.SetValue(title)
 	w.titleText.SetBold(true)
 
-	w.msgDetailButton.SetText("メッセージ詳細")
+	w.msgDetailButton.SetText("Messages")
 	w.msgDetailButton.OnDown(w.onMsgDetail)
 
 	return nil

@@ -9,10 +9,7 @@ builds:
     env:
       - CGO_ENABLED=0
 
-universal_binaries:
-  - replace: true
-
 archives:
   - formats:
-      - zip
+      - binary
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"

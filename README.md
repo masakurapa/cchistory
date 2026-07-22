@@ -16,8 +16,16 @@ A GUI viewer for [Claude Code](https://claude.ai/code) conversation history.
 
 ## Installation
 
-```
+### Option 1: Install with Go
+
+```sh
 go install github.com/masakurapa/cchistory@latest
+```
+
+### Option 2: Prebuilt binary (macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/masakurapa/cchistory/main/install.sh | sh
 ```
 
 ## Usage

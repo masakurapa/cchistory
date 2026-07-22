@@ -23,6 +23,11 @@ type AgentNameEntry struct {
 	SessionID string `json:"sessionId"`
 }
 
+type AITitleEntry struct {
+	AITitle   string `json:"aiTitle"`
+	SessionID string `json:"sessionId"`
+}
+
 // Session holds parsed metadata from a single JSONL file.
 type Session struct {
 	ID      string
@@ -46,7 +51,7 @@ func ParseSession(path string) (Session, error) {
 
 	s := Session{ModTime: info.ModTime()}
 
-	var customTitle, agentName string
+	var customTitle, aiTitle, agentName string
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
@@ -59,6 +64,16 @@ func ParseSession(path string) (Session, error) {
 			var e CustomTitleEntry
 			if err := json.Unmarshal(scanner.Bytes(), &e); err == nil {
 				customTitle = e.CustomTitle
+				if s.ID == "" {
+					s.ID = e.SessionID
+				}
+			}
+		case "ai-title":
+			var e AITitleEntry
+			if err := json.Unmarshal(scanner.Bytes(), &e); err == nil {
+				if e.AITitle != "" {
+					aiTitle = e.AITitle
+				}
 				if s.ID == "" {
 					s.ID = e.SessionID
 				}
@@ -77,9 +92,12 @@ func ParseSession(path string) (Session, error) {
 	if s.ID == "" {
 		s.ID = strings.TrimSuffix(filepath.Base(path), ".jsonl")
 	}
-	if customTitle != "" {
+	switch {
+	case customTitle != "":
 		s.Name = customTitle
-	} else {
+	case aiTitle != "":
+		s.Name = aiTitle
+	case agentName != "":
 		s.Name = agentName
 	}
 	return s, scanner.Err()

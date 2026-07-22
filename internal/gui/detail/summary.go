@@ -17,6 +17,7 @@ type summaryViewWidget struct {
 	onMsgDetail func(*guigui.Context)
 
 	backButton      basicwidget.Button
+	screenLabel     basicwidget.Text
 	titleText       basicwidget.Text
 	summaryForm     metaFormWidget
 	msgDetailButton basicwidget.Button
@@ -32,6 +33,7 @@ func (w *summaryViewWidget) setData(d types.SessionDetail) {
 
 func (w *summaryViewWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) error {
 	adder.AddWidget(&w.backButton)
+	adder.AddWidget(&w.screenLabel)
 	adder.AddWidget(&w.titleText)
 	adder.AddWidget(&w.summaryForm)
 	adder.AddWidget(&w.msgDetailButton)
@@ -39,8 +41,10 @@ func (w *summaryViewWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder)
 	w.backButton.SetText("← Back")
 	w.backButton.OnDown(w.onBack)
 
+	w.screenLabel.SetValue("Session Summary")
+	w.screenLabel.SetBold(true)
+
 	w.titleText.SetValue(w.title)
-	w.titleText.SetBold(true)
 
 	w.msgDetailButton.SetText("Messages")
 	w.msgDetailButton.OnDown(w.onMsgDetail)
@@ -54,7 +58,7 @@ func (w *summaryViewWidget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds,
 	w.headerItems = slices.Delete(w.headerItems, 0, len(w.headerItems))
 	w.headerItems = append(w.headerItems,
 		guigui.LinearLayoutItem{Widget: &w.backButton, Size: guigui.FixedSize(u * 3)},
-		guigui.LinearLayoutItem{Widget: &w.titleText, Size: guigui.FlexibleSize(1)},
+		guigui.LinearLayoutItem{Widget: &w.screenLabel, Size: guigui.FlexibleSize(1)},
 	)
 	header := guigui.LinearLayout{
 		Direction: guigui.LayoutDirectionHorizontal,
@@ -65,6 +69,7 @@ func (w *summaryViewWidget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds,
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
 	w.layoutItems = append(w.layoutItems,
 		guigui.LinearLayoutItem{Layout: &header, Size: guigui.FixedSize(u)},
+		guigui.LinearLayoutItem{Widget: &w.titleText, Size: guigui.FixedSize(u)},
 		guigui.LinearLayoutItem{Widget: &w.summaryForm},
 		guigui.LinearLayoutItem{Widget: &w.msgDetailButton, Size: guigui.FixedSize(u * 2)},
 	)

@@ -17,8 +17,7 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 		return SessionDetail{}, err
 	}
 
-	var totalOutput, turnCount int
-	var last Usage
+	var totalInput, totalOutput, totalCacheRead, totalCacheCreation, turnCount int
 	var start, end time.Time
 	for _, entry := range items {
 		if _, ok := entry.(*Turn); ok {
@@ -32,16 +31,16 @@ func ParseSessionDetail(path string, session Session) (SessionDetail, error) {
 			end = et
 		}
 		u := entry.Usage()
-		if u.InputTokens+u.CacheReadInputTokens+u.CacheCreationInputTokens > 0 {
-			last = u
-		}
+		totalInput += u.InputTokens
+		totalCacheRead += u.CacheReadInputTokens
+		totalCacheCreation += u.CacheCreationInputTokens
 		totalOutput += u.OutputTokens
 	}
 	total := Usage{
-		InputTokens:              last.InputTokens,
+		InputTokens:              totalInput,
 		OutputTokens:             totalOutput,
-		CacheReadInputTokens:     last.CacheReadInputTokens,
-		CacheCreationInputTokens: last.CacheCreationInputTokens,
+		CacheReadInputTokens:     totalCacheRead,
+		CacheCreationInputTokens: totalCacheCreation,
 	}
 
 	title := session.ID

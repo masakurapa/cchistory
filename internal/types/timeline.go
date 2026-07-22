@@ -3,6 +3,7 @@ package types
 import (
 	"bufio"
 	"encoding/json"
+	"html"
 	"os"
 	"strings"
 	"time"
@@ -84,9 +85,9 @@ func extractTagContent(s, tag string) string {
 	start += len(open)
 	end := strings.Index(s[start:], close)
 	if end < 0 {
-		return strings.TrimSpace(s[start:])
+		return html.UnescapeString(strings.TrimSpace(s[start:]))
 	}
-	return strings.TrimSpace(s[start : start+end])
+	return html.UnescapeString(strings.TrimSpace(s[start : start+end]))
 }
 
 func ParseTimeline(path string) ([]TimelineItem, error) {

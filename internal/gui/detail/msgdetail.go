@@ -8,10 +8,31 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/guigui-gui/guigui"
 	"github.com/guigui-gui/guigui/basicwidget"
 	"github.com/masakurapa/cchistory/internal/types"
 )
+
+// coloredDivider draws a vertical line whose widget width provides left/right margin.
+// Color and stroke width match basicwidget.Divider.
+type coloredDivider struct {
+	guigui.DefaultWidget
+}
+
+func (d *coloredDivider) Draw(ctx *guigui.Context, wb *guigui.WidgetBounds, dst *ebiten.Image) {
+	b := wb.Bounds()
+	strokeWidth := float32(1 * ctx.Scale())
+	x := float32(b.Min.X+b.Max.X) / 2
+	// same lightness as draw.DividerColor (light=0.8, dark=0.2)
+	var clr color.RGBA
+	if ctx.ColorMode() == ebiten.ColorModeDark {
+		clr = color.RGBA{R: 51, G: 51, B: 51, A: 255}
+	} else {
+		clr = color.RGBA{R: 204, G: 204, B: 204, A: 255}
+	}
+	vector.StrokeLine(dst, x, float32(b.Min.Y), x, float32(b.Max.Y), strokeWidth, clr, false)
+}
 
 // turnListRow is a 2-line clickable row: date on top, first line of message below.
 type turnListRow struct {
@@ -387,10 +408,10 @@ type msgDetailWidget struct {
 	backButton      basicwidget.Button
 	leftPanel       basicwidget.Panel
 	listContent     turnListContent
-	placeholder     basicwidget.Text
-	rightPanel      basicwidget.Panel
-	rightContent    turnDetailWidget
-	compactContent  compactDetailWidget
+	rightPanel     basicwidget.Panel
+	rightContent   turnDetailWidget
+	compactContent compactDetailWidget
+	divider        coloredDivider
 
 	headerItems []guigui.LinearLayoutItem
 	bodyItems   []guigui.LinearLayoutItem
@@ -400,6 +421,7 @@ type msgDetailWidget struct {
 func (w *msgDetailWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) error {
 	adder.AddWidget(&w.backButton)
 	adder.AddWidget(&w.leftPanel)
+	adder.AddWidget(&w.divider)
 	adder.AddWidget(&w.rightPanel)
 
 	w.backButton.SetText("← Back")
@@ -424,12 +446,10 @@ func (w *msgDetailWidget) Build(ctx *guigui.Context, adder *guigui.ChildAdder) e
 			w.compactContent.cb = *item.CompactBoundary
 			w.rightPanel.SetContent(&w.compactContent)
 		} else {
-			w.placeholder.SetValue("← Select a message")
-			w.rightPanel.SetContent(&w.placeholder)
+			w.rightPanel.SetContent(nil)
 		}
 	} else {
-		w.placeholder.SetValue("← Select a message")
-		w.rightPanel.SetContent(&w.placeholder)
+		w.rightPanel.SetContent(nil)
 	}
 	w.rightPanel.SetContentConstraints(basicwidget.PanelContentConstraintsFixedWidth)
 
@@ -451,12 +471,12 @@ func (w *msgDetailWidget) Layout(ctx *guigui.Context, wb *guigui.WidgetBounds, l
 	w.bodyItems = slices.Delete(w.bodyItems, 0, len(w.bodyItems))
 	w.bodyItems = append(w.bodyItems,
 		guigui.LinearLayoutItem{Widget: &w.leftPanel, Size: guigui.FlexibleSize(1)},
+		guigui.LinearLayoutItem{Widget: &w.divider, Size: guigui.FixedSize(u / 2)},
 		guigui.LinearLayoutItem{Widget: &w.rightPanel, Size: guigui.FlexibleSize(2)},
 	)
 	body := guigui.LinearLayout{
 		Direction: guigui.LayoutDirectionHorizontal,
 		Items:     w.bodyItems,
-		Gap:       u / 2,
 	}
 
 	w.layoutItems = slices.Delete(w.layoutItems, 0, len(w.layoutItems))
